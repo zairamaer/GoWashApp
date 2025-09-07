@@ -1,9 +1,9 @@
 <template>
-  <div class="appointments-management">
+  <div class="upcoming-schedules">
     <!-- Page Header -->
     <div class="page-header">
-      <h1>Appointments Management</h1>
-      <p>View and manage completed customer appointments.</p>
+      <h1>Upcoming Schedules</h1>
+      <p>Manage confirmed appointments and update their status.</p>
     </div>
 
     <!-- Filters and Search -->
@@ -12,7 +12,7 @@
         <div class="filter-group">
           <label>Time Period:</label>
           <select v-model="timePeriod" @change="filterAppointments">
-            <option value="all">All Completed</option>
+            <option value="all">All Upcoming</option>
             <option value="today">Today</option>
             <option value="week">This Week</option>
             <option value="month">This Month</option>
@@ -33,100 +33,106 @@
           <label>Sort by:</label>
           <select v-model="sortBy" @change="sortAppointments">
             <option value="date">Date (Nearest First)</option>
-            <option value="dateDesc">Date (Latest First)</option>
             <option value="customer">Customer Name</option>
             <option value="service">Service Type</option>
-            <option value="price">Price (Low to High)</option>
-            <option value="priceDesc">Price (High to Low)</option>
-          </select>
-        </div>
-        
-        <div class="filter-group">
-          <label>Filter by Month:</label>
-          <select v-model="monthFilter" @change="filterAppointments">
-            <option value="">All Months</option>
-            <option v-for="(month, index) in monthOptions" :key="index" :value="month.value">
-              {{ month.label }}
-            </option>
           </select>
         </div>
       </div>
     </div>
 
-    <!-- Appointments Table -->
-    <div class="table-container">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Customer</th>
-            <th>Service</th>
-            <th>Vehicle Size</th>
-            <th>Date & Time</th>
-            <th>Status</th>
-            <th>Price</th>
-            <th>Notes</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="appointment in filteredAppointments" :key="appointment.appointmentID">
-            <td>
+    <!-- Upcoming Schedules List -->
+    <div class="schedules-container">
+      <div v-if="loading" class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>Loading upcoming schedules...</p>
+      </div>
+      
+      <div v-else-if="filteredAppointments.length === 0" class="empty-state">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/>
+          <line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        <h3>No upcoming schedules</h3>
+        <p>No confirmed appointments found for the selected criteria.</p>
+      </div>
+      
+      <div v-else class="schedules-list">
+        <div 
+          v-for="appointment in filteredAppointments" 
+          :key="appointment.appointmentID"
+          class="schedule-card"
+          :class="{ 'past-appointment': isAppointmentInPast(appointment) }"
+        >
+          <div class="schedule-header">
+            <div class="appointment-info">
               <div class="customer-info">
-                <div class="customer-name">{{ appointment.customer?.name }}</div>
-                <div class="customer-contact">
-                  <div>{{ appointment.customer?.email }}</div>
-                  <div>{{ appointment.customer?.phone }}</div>
-                </div>
+                <span class="customer-name">{{ appointment.customer?.name }}</span>
+                <span class="customer-contact">{{ appointment.customer?.email }} • {{ appointment.customer?.phone }}</span>
               </div>
-            </td>
-            <td>
-              <div class="service-info">
-                <div class="service-name">{{ getServiceName(appointment.service_rate?.serviceTypeID) }}</div>
-                <div class="service-description">{{ getServiceDescription(appointment.service_rate?.serviceTypeID) }}</div>
-              </div>
-            </td>
-            <td>
+            </div>
+            <div class="appointment-datetime">
+              <div class="date">{{ formatDate(appointment.appointmentDateTime) }}</div>
+              <div class="time">{{ formatTime(appointment.appointmentDateTime) }}</div>
+            </div>
+          </div>
+          
+          <div class="schedule-details">
+            <div class="service-info">
+              <div class="service-name">{{ getServiceName(appointment.service_rate?.serviceTypeID) }}</div>
+              <div class="service-description">{{ getServiceDescription(appointment.service_rate?.serviceTypeID) }}</div>
+            </div>
+            <div class="vehicle-info">
               <span class="vehicle-size">{{ getVehicleSizeDescription(appointment.service_rate?.vehicleSizeCode) }}</span>
-            </td>
-            <td>
-              <div class="datetime-info">
-                <div class="date">{{ formatDate(appointment.appointmentDateTime) }}</div>
-                <div class="time">{{ formatTime(appointment.appointmentDateTime) }}</div>
-              </div>
-            </td>
-            <td>
-              <span class="status-badge completed">
-                {{ appointment.status }}
-              </span>
-            </td>
-            <td class="price-cell">₱{{ parseFloat(appointment.service_rate?.price || 0).toFixed(2) }}</td>
-            <td>
-              <div class="notes-cell">
-                <span v-if="appointment.notes" class="has-notes" :title="appointment.notes">
-                  {{ appointment.notes.length > 30 ? appointment.notes.substring(0, 30) + '...' : appointment.notes }}
-                </span>
-                <span v-else class="no-notes">No notes</span>
-              </div>
-            </td>
-            <td>
-              <div class="action-buttons">
-                <button @click="editAppointment(appointment)" class="edit-btn" title="Edit">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                  </svg>
-                </button>
-                <button @click="deleteAppointment(appointment.appointmentID)" class="delete-btn" title="Delete">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3,6 5,6 21,6"/>
-                    <path d="M19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"/>
-                  </svg>
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </div>
+            <div class="price-info">
+              <span class="price">₱{{ parseFloat(appointment.service_rate?.price || 0).toFixed(2) }}</span>
+            </div>
+          </div>
+          
+          <div v-if="appointment.notes" class="notes-section">
+            <div class="notes-label">Notes:</div>
+            <div class="notes-content">{{ appointment.notes }}</div>
+          </div>
+          
+          <div class="schedule-actions">
+            <div class="status-actions">
+              <button 
+                @click="updateAppointmentStatus(appointment.appointmentID, 'completed')"
+                class="action-btn complete-btn"
+                :disabled="isAppointmentInPast(appointment)"
+                title="Mark as completed"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20,6 9,17 4,12"/>
+                </svg>
+                Mark Completed
+              </button>
+              <button 
+                @click="updateAppointmentStatus(appointment.appointmentID, 'cancelled')"
+                class="action-btn cancel-btn"
+                title="Cancel appointment"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+                Cancel
+              </button>
+            </div>
+            <div class="edit-actions">
+              <button @click="editAppointment(appointment)" class="action-btn edit-btn" title="Edit appointment">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                Edit
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Edit Appointment Modal -->
@@ -157,13 +163,6 @@
           </div>
           
           <div class="form-group">
-            <label>Status</label>
-            <span class="status-badge completed">
-              {{ appointmentForm.status }}
-            </span>
-          </div>
-          
-          <div class="form-group">
             <label>Notes</label>
             <textarea v-model="appointmentForm.notes" rows="3" placeholder="Add any notes about this appointment..."></textarea>
           </div>
@@ -174,24 +173,6 @@
           </div>
         </form>
       </div>
-    </div>
-
-    <!-- Loading State -->
-    <div v-if="loading" class="loading-state">
-      <div class="loading-spinner"></div>
-      <p>Loading appointments...</p>
-    </div>
-
-    <!-- Empty State -->
-    <div v-if="!loading && filteredAppointments.length === 0" class="empty-state">
-      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-        <line x1="16" y1="2" x2="16" y2="6"/>
-        <line x1="8" y1="2" x2="8" y2="6"/>
-        <line x1="3" y1="10" x2="21" y2="10"/>
-      </svg>
-      <h3>No completed appointments found</h3>
-      <p>No completed appointments match your current filters.</p>
     </div>
   </div>
 </template>
@@ -210,7 +191,6 @@ const loading = ref(false)
 const timePeriod = ref('all')
 const searchQuery = ref('')
 const sortBy = ref('date')
-const monthFilter = ref('')
 
 // Modal state
 const showEditModal = ref(false)
@@ -219,45 +199,12 @@ const editingAppointment = ref(null)
 // Form data
 const appointmentForm = reactive({
   appointmentDateTime: '',
-  status: '',
   notes: ''
 })
 
 // Computed
-const monthOptions = computed(() => {
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ]
-  
-  const currentYear = new Date().getFullYear()
-  const currentMonth = new Date().getMonth()
-  const options = []
-  
-  // Add current year months
-  for (let i = 0; i < 12; i++) {
-    const monthIndex = (currentMonth - i + 12) % 12
-    const year = currentMonth - i < 0 ? currentYear - 1 : currentYear
-    options.push({
-      value: `${year}-${monthIndex}`,
-      label: `${months[monthIndex]} ${year}`
-    })
-  }
-  
-  // Add "This Year" option
-  options.push({
-    value: `year-${currentYear}`,
-    label: `This Year (${currentYear})`
-  })
-  
-  return options
-})
-
 const filteredAppointments = computed(() => {
   let filtered = appointments.value
-
-  // Filter to only show completed appointments
-  filtered = filtered.filter(apt => apt.status === 'completed')
 
   // Filter by time period
   if (timePeriod.value !== 'all') {
@@ -285,27 +232,6 @@ const filteredAppointments = computed(() => {
     })
   }
 
-  // Filter by month
-  if (monthFilter.value) {
-    filtered = filtered.filter(apt => {
-      const aptDate = new Date(apt.appointmentDateTime)
-      
-      // Handle year filter (e.g., "year-2024")
-      if (monthFilter.value.startsWith('year-')) {
-        const year = parseInt(monthFilter.value.split('-')[1])
-        return aptDate.getFullYear() === year
-      }
-      
-      // Handle specific month filter (e.g., "2024-0" for January 2024)
-      if (monthFilter.value.includes('-')) {
-        const [year, month] = monthFilter.value.split('-').map(Number)
-        return aptDate.getFullYear() === year && aptDate.getMonth() === month
-      }
-      
-      return true
-    })
-  }
-
   // Filter by search query
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
@@ -321,16 +247,10 @@ const filteredAppointments = computed(() => {
     switch (sortBy.value) {
       case 'date':
         return new Date(a.appointmentDateTime) - new Date(b.appointmentDateTime)
-      case 'dateDesc':
-        return new Date(b.appointmentDateTime) - new Date(a.appointmentDateTime)
       case 'customer':
         return (a.customer?.name || '').localeCompare(b.customer?.name || '')
       case 'service':
         return getServiceName(a.service_rate?.serviceTypeID).localeCompare(getServiceName(b.service_rate?.serviceTypeID))
-      case 'price':
-        return parseFloat(a.service_rate?.price || 0) - parseFloat(b.service_rate?.price || 0)
-      case 'priceDesc':
-        return parseFloat(b.service_rate?.price || 0) - parseFloat(a.service_rate?.price || 0)
       default:
         return 0
     }
@@ -344,7 +264,7 @@ const loadData = async () => {
   loading.value = true
   try {
     const [appointmentsData, typesData, sizesData] = await Promise.all([
-      appointmentApi.getAppointments(),
+      appointmentApi.getConfirmedAppointments(),
       serviceApi.getServiceTypes(),
       serviceApi.getVehicleSizes()
     ])
@@ -382,11 +302,36 @@ const getVehicleSizeDescription = (vehicleSizeCode) => {
   return vehicleSize?.vehicleSizeDescription || vehicleSizeCode || 'Unknown'
 }
 
+const isAppointmentInPast = (appointment) => {
+  const appointmentDate = new Date(appointment.appointmentDateTime)
+  const now = new Date()
+  return appointmentDate < now
+}
+
+const updateAppointmentStatus = async (appointmentID, newStatus) => {
+  const statusText = newStatus === 'completed' ? 'completed' : 'cancelled'
+  const confirmMessage = newStatus === 'completed' 
+    ? 'Are you sure you want to mark this appointment as completed?' 
+    : 'Are you sure you want to cancel this appointment?'
+  
+  if (confirm(confirmMessage)) {
+    try {
+      await appointmentApi.updateAppointment(appointmentID, { status: newStatus })
+      
+      // Remove from the list since it's no longer confirmed
+      appointments.value = appointments.value.filter(apt => apt.appointmentID !== appointmentID)
+      
+      alert(`Appointment ${statusText} successfully!`)
+    } catch (error) {
+      console.error('Error updating appointment status:', error)
+      alert(`Failed to ${statusText} appointment`)
+    }
+  }
+}
 
 const editAppointment = (appointment) => {
   editingAppointment.value = appointment
   appointmentForm.appointmentDateTime = formatDateTimeForInput(appointment.appointmentDateTime)
-  appointmentForm.status = appointment.status
   appointmentForm.notes = appointment.notes || ''
   showEditModal.value = true
 }
@@ -399,26 +344,14 @@ const saveAppointment = async () => {
     const appointment = appointments.value.find(apt => apt.appointmentID === editingAppointment.value.appointmentID)
     if (appointment) {
       appointment.appointmentDateTime = appointmentForm.appointmentDateTime
-      appointment.status = appointmentForm.status
       appointment.notes = appointmentForm.notes
     }
     
     closeModal()
+    alert('Appointment updated successfully!')
   } catch (error) {
     console.error('Error saving appointment:', error)
     alert('Failed to save appointment changes')
-  }
-}
-
-const deleteAppointment = async (id) => {
-  if (confirm('Are you sure you want to delete this appointment?')) {
-    try {
-      await appointmentApi.deleteAppointment(id)
-      appointments.value = appointments.value.filter(apt => apt.appointmentID !== id)
-    } catch (error) {
-      console.error('Error deleting appointment:', error)
-      alert('Failed to delete appointment')
-    }
   }
 }
 
@@ -427,14 +360,17 @@ const closeModal = () => {
   editingAppointment.value = null
   Object.assign(appointmentForm, {
     appointmentDateTime: '',
-    status: '',
     notes: ''
   })
 }
 
 const formatDate = (dateTimeString) => {
   if (!dateTimeString) return 'N/A'
-  return new Date(dateTimeString).toLocaleDateString()
+  return new Date(dateTimeString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
 }
 
 const formatTime = (dateTimeString) => {
@@ -448,7 +384,6 @@ const formatDateTimeForInput = (dateTimeString) => {
   return date.toISOString().slice(0, 16) // Format: YYYY-MM-DDTHH:MM
 }
 
-
 // Lifecycle
 onMounted(() => {
   loadData()
@@ -456,7 +391,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.appointments-management {
+.upcoming-schedules {
   background: #f8fafc;
   min-height: calc(100vh - 64px);
 }
@@ -521,37 +456,51 @@ onMounted(() => {
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-.table-container {
+.schedules-container {
   background: white;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   overflow: hidden;
-  overflow-x: auto;
 }
 
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 1200px;
+.schedules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
 }
 
-.data-table th {
-  background: #f7fafc;
-  color: #4a5568;
-  font-weight: 600;
-  padding: 12px 16px;
-  text-align: left;
-  border-bottom: 1px solid #e2e8f0;
+.schedule-card {
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  transition: all 0.3s ease;
+  background: white;
 }
 
-.data-table td {
-  padding: 12px 16px;
-  border-bottom: 1px solid #f1f5f9;
+.schedule-card:hover {
+  border-color: #667eea;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.schedule-card.past-appointment {
+  opacity: 0.7;
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.schedule-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.appointment-info h3 {
   color: #2d3748;
-}
-
-.data-table tr:hover {
-  background: #f8fafc;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
 }
 
 .customer-info {
@@ -563,127 +512,221 @@ onMounted(() => {
 .customer-name {
   font-weight: 600;
   color: #2d3748;
+  font-size: 16px;
 }
 
 .customer-contact {
-  font-size: 12px;
   color: #718096;
+  font-size: 14px;
+}
+
+.appointment-datetime {
+  text-align: right;
+}
+
+.appointment-datetime .date {
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 16px;
+}
+
+.appointment-datetime .time {
+  color: #667eea;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.schedule-details {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 
 .service-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex: 1;
+  min-width: 200px;
 }
 
 .service-name {
   font-weight: 600;
   color: #2d3748;
+  font-size: 16px;
+  margin-bottom: 4px;
 }
 
 .service-description {
-  font-size: 12px;
   color: #718096;
+  font-size: 14px;
+}
+
+.vehicle-info {
+  min-width: 120px;
 }
 
 .vehicle-size {
   background: #e6fffa;
   color: #319795;
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.datetime-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.date {
-  font-weight: 600;
-  color: #2d3748;
-}
-
-.time {
-  font-size: 12px;
-  color: #718096;
-}
-
-.status-badge {
   padding: 6px 12px;
   border-radius: 12px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
-  text-transform: capitalize;
   display: inline-block;
 }
 
-.status-badge.confirmed {
-  background: #f0fff4;
+.price-info {
+  min-width: 100px;
+  text-align: right;
+}
+
+.price {
+  font-weight: 700;
   color: #38a169;
+  font-size: 18px;
 }
 
-.status-badge.completed {
-  background: #e6fffa;
-  color: #319795;
+.notes-section {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
 }
 
-.price-cell {
-  font-weight: 600;
-  color: #38a169;
-}
-
-.notes-cell {
-  max-width: 200px;
-}
-
-.has-notes {
+.notes-label {
+  font-weight: 500;
   color: #4a5568;
-  font-size: 12px;
+  font-size: 14px;
+  margin-bottom: 4px;
 }
 
-.no-notes {
-  color: #a0aec0;
-  font-style: italic;
-  font-size: 12px;
+.notes-content {
+  color: #2d3748;
+  font-size: 14px;
 }
 
-.action-buttons {
+.schedule-actions {
   display: flex;
-  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
 }
 
-.edit-btn, .delete-btn {
-  border: none;
-  padding: 6px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
+.status-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.action-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.complete-btn {
+  background: #f0fff4;
+  color: #38a169;
+  border: 1px solid #68d391;
+}
+
+.complete-btn:hover:not(:disabled) {
+  background: #dcfce7;
+  border-color: #4ade80;
+}
+
+.complete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cancel-btn {
+  background: #fed7d7;
+  color: #e53e3e;
+  border: 1px solid #fc8181;
+}
+
+.cancel-btn:hover {
+  background: #fecaca;
+  border-color: #f87171;
 }
 
 .edit-btn {
-  background: #4299e1;
-  color: white;
+  background: #e6f3ff;
+  color: #2563eb;
+  border: 1px solid #93c5fd;
 }
 
 .edit-btn:hover {
-  background: #3182ce;
+  background: #dbeafe;
+  border-color: #60a5fa;
 }
 
-.delete-btn {
-  background: #e53e3e;
-  color: white;
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.delete-btn:hover {
-  background: #c53030;
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e2e8f0;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
 }
 
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  color: #718096;
+}
+
+.empty-state svg {
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state h3 {
+  color: #4a5568;
+  margin: 0 0 8px 0;
+}
+
+.empty-state p {
+  margin: 0;
+  text-align: center;
+}
+
+/* Modal Styles */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -751,7 +794,6 @@ onMounted(() => {
 }
 
 .form-group input,
-.form-group select,
 .form-group textarea {
   width: 100%;
   padding: 10px 12px;
@@ -762,7 +804,6 @@ onMounted(() => {
 }
 
 .form-group input:focus,
-.form-group select:focus,
 .form-group textarea:focus {
   outline: none;
   border-color: #667eea;
@@ -809,59 +850,7 @@ onMounted(() => {
   background: #5a67d8;
 }
 
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e2e8f0;
-  border-top: 4px solid #667eea;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 16px;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  color: #718096;
-}
-
-.empty-state svg {
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-
-.empty-state h3 {
-  color: #4a5568;
-  margin: 0 0 8px 0;
-}
-
-.empty-state p {
-  margin: 0;
-  text-align: center;
-}
-
+/* Responsive Design */
 @media (max-width: 768px) {
   .filters-row {
     flex-direction: column;
@@ -872,13 +861,35 @@ onMounted(() => {
     min-width: auto;
   }
   
-  .data-table {
-    font-size: 14px;
+  .schedule-header {
+    flex-direction: column;
+    gap: 12px;
   }
   
-  .data-table th,
-  .data-table td {
-    padding: 8px 12px;
+  .appointment-datetime {
+    text-align: left;
+  }
+  
+  .schedule-details {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .schedule-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .status-actions,
+  .edit-actions {
+    justify-content: center;
+  }
+  
+  .action-btn {
+    flex: 1;
+    justify-content: center;
   }
 }
 </style>

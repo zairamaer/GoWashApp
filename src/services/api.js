@@ -328,6 +328,48 @@ export const serviceApi = {
   }
 }
 
+// Customer API
+export const customerApi = {
+  // Get all customers
+  async getCustomers() {
+    const response = await api.get('/customers')
+    // Handle the data wrapper - the API returns { data: [...] }
+    return response.data.data || response.data
+  },
+
+  // Get a specific customer by ID
+  async getCustomer(id) {
+    const response = await api.get(`/customers/${id}`)
+    return response.data
+  },
+
+  // Update customer information
+  async updateCustomer(id, customerData) {
+    const response = await api.put(`/customers/${id}`, customerData)
+    return response.data
+  },
+
+  // Get customer with appointments by customer ID
+  async getCustomerWithAppointments(customerId) {
+    // First try the individual customer endpoint
+    try {
+      const response = await api.get(`/customers/${customerId}`)
+      console.log('Individual customer API response:', response.data)
+      // Handle the data wrapper if it exists
+      return response.data.data || response.data
+    } catch (error) {
+      // If individual endpoint fails, get all customers and filter
+      console.log('Individual customer endpoint failed, using all customers endpoint')
+      const allCustomers = await this.getCustomers()
+      const customer = allCustomers.find(c => c.id == customerId)
+      if (!customer) {
+        throw new Error('Customer not found')
+      }
+      return customer
+    }
+  }
+}
+
 // Appointments API
 export const appointmentApi = {
   async getAppointments() {
@@ -358,10 +400,83 @@ export const appointmentApi = {
   async getCustomerAppointments() {
     const response = await api.get('/customer/appointments')
     return response.data
+  },
+
+  async getAppointmentsByDate(date) {
+    // Since there's no specific date endpoint, get all appointments and filter on frontend
+    const response = await api.get('/appointments')
+    const allAppointments = response.data
+    
+    // Filter appointments for the specific date
+    const appointmentsForDate = allAppointments.filter(appointment => {
+      const appointmentDate = appointment.appointmentDateTime.split(' ')[0] // Get date part
+      return appointmentDate === date
+    })
+    
+    return appointmentsForDate
+  },
+
+  async getAppointmentsGroupedByCustomer() {
+    const response = await api.get('/appointments')
+    const allAppointments = response.data
+    
+    // Group appointments by customer
+    const groupedByCustomer = {}
+    
+    allAppointments.forEach(appointment => {
+      const customerId = appointment.customerID
+      const customer = appointment.customer
+      
+      if (!groupedByCustomer[customerId]) {
+        groupedByCustomer[customerId] = {
+          customer: customer,
+          appointments: [],
+          nearestAppointment: null,
+          appointmentCount: 0
+        }
+      }
+      
+      // Only include confirmed and completed appointments
+      if (appointment.status === 'confirmed' || appointment.status === 'completed') {
+        groupedByCustomer[customerId].appointments.push(appointment)
+        groupedByCustomer[customerId].appointmentCount++
+        
+        // Find nearest appointment
+        const appointmentDate = new Date(appointment.appointmentDateTime)
+        if (!groupedByCustomer[customerId].nearestAppointment || 
+            appointmentDate < new Date(groupedByCustomer[customerId].nearestAppointment.appointmentDateTime)) {
+          groupedByCustomer[customerId].nearestAppointment = appointment
+        }
+      }
+    })
+    
+    // Convert to array and sort by nearest appointment date
+    const customersWithAppointments = Object.values(groupedByCustomer)
+      .filter(customerGroup => customerGroup.appointmentCount > 0)
+      .sort((a, b) => {
+        if (!a.nearestAppointment && !b.nearestAppointment) return 0
+        if (!a.nearestAppointment) return 1
+        if (!b.nearestAppointment) return -1
+        return new Date(a.nearestAppointment.appointmentDateTime) - new Date(b.nearestAppointment.appointmentDateTime)
+      })
+    
+    return customersWithAppointments
+  },
+
+  async getConfirmedAppointments() {
+    const response = await api.get('/appointments')
+    const allAppointments = response.data
+    
+    // Filter to only confirmed appointments and sort by date
+    const confirmedAppointments = allAppointments
+      .filter(appointment => appointment.status === 'confirmed')
+      .sort((a, b) => new Date(a.appointmentDateTime) - new Date(b.appointmentDateTime))
+    
+    return confirmedAppointments
   }
 }
 
-// Payments API
+// Payments API - Enhanced with status updates
 export const paymentApi = {
   async getPayments() {
     const response = await api.get('/payments')
@@ -386,6 +501,66 @@ export const paymentApi = {
   async checkPaymentStatus(paymentId) {
     const response = await api.get(`/payments/status/${paymentId}`)
     return response.data
+  },
+
+  // Get payment by appointment ID using existing payments endpoint
+  async getPaymentByAppointment(appointmentId) {
+    try {
+      const response = await api.get('/payments')
+      const allPayments = response.data.data || response.data
+      const payment = allPayments.find(p => p.appointmentID == appointmentId)
+      return payment || null
+    } catch (error) {
+      console.error('Error fetching payment by appointment:', error)
+      return null
+    }
+  },
+
+  // Update payment status to paid (called by webhook or success handler)
+  async markPaymentAsPaid(paymentId, transactionData = {}) {
+    const paymentData = {
+      status: 'paid',
+      paymentDateTime: new Date().toISOString(),
+      ...transactionData
+    }
+    
+    try {
+      const response = await api.put(`/payments/${paymentId}`, paymentData)
+      console.log('Payment marked as paid:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('Error marking payment as paid:', error)
+      throw error
+    }
+  },
+
+  // Update payment status to failed
+  async markPaymentAsFailed(paymentId, errorReason = '') {
+    const paymentData = {
+      status: 'failed',
+      error_reason: errorReason,
+      paymentDateTime: new Date().toISOString()
+    }
+    
+    try {
+      const response = await api.put(`/payments/${paymentId}`, paymentData)
+      console.log('Payment marked as failed:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('Error marking payment as failed:', error)
+      throw error
+    }
+  },
+
+  // Get payment status for appointment
+  async getAppointmentPaymentStatus(appointmentId) {
+    try {
+      const payment = await this.getPaymentByAppointment(appointmentId)
+      return payment ? payment.status : 'pending'
+    } catch (error) {
+      console.error('Error getting payment status for appointment:', error)
+      return 'pending'
+    }
   }
 }
 

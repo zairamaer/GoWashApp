@@ -11,11 +11,8 @@
           <label>Filter by Status:</label>
           <select v-model="statusFilter" @change="filterAppointments">
             <option value="">All</option>
-            <option value="pending">Pending</option>
             <option value="confirmed">Confirmed</option>
-            <option value="in-progress">In Progress</option>
             <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
           </select>
         </div>
         <div class="filter-group">
@@ -28,13 +25,24 @@
         </div>
       </div>
 
-      <div v-if="filteredAppointments.length > 0" class="appointments-list">
+      <div v-if="loading" class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>Loading appointments...</p>
+      </div>
+      
+      <div v-else-if="error" class="error-state">
+        <div class="error-icon">⚠️</div>
+        <h3>Error Loading Appointments</h3>
+        <p>{{ error }}</p>
+        <button @click="loadAppointments" class="retry-btn">Try Again</button>
+      </div>
+      
+      <div v-else-if="filteredAppointments.length > 0" class="appointments-list">
         <div v-for="appointment in filteredAppointments" :key="appointment.id" 
-             class="appointment-card" :class="appointment.status">
+             class="appointment-card" :class="[appointment.status, { 'past-appointment': isAppointmentInPast(appointment) }]">
           <div class="appointment-header">
-            <div class="service-info">
-              <h3>{{ appointment.serviceName }}</h3>
-              <span class="service-price">${{ appointment.price }}</span>
+            <div class="appointment-id">
+              <h3>Appointment #{{ appointment.id }}</h3>
             </div>
             <div class="appointment-status" :class="appointment.status">
               {{ appointment.status.replace('-', ' ').toUpperCase() }}
@@ -43,33 +51,58 @@
           
           <div class="appointment-details">
             <div class="detail-row">
-              <span class="detail-label">Date:</span>
+              <span class="detail-label">📅 Date:</span>
               <span class="detail-value">{{ formatDate(appointment.appointmentDate) }}</span>
             </div>
             <div class="detail-row">
-              <span class="detail-label">Time:</span>
+              <span class="detail-label">🕐 Time:</span>
               <span class="detail-value">{{ appointment.appointmentTime }}</span>
             </div>
             <div class="detail-row">
-              <span class="detail-label">Vehicle:</span>
-              <span class="detail-value">{{ appointment.vehicleType }}</span>
+              <span class="detail-label">🚗 Vehicle:</span>
+              <span class="detail-value">{{ appointment.vehicleType || 'Not specified' }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">🔧 Service:</span>
+              <span class="detail-value">{{ appointment.serviceName || 'Service ID: ' + appointment.service_rate_id }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">💰 Price:</span>
+              <span class="detail-value">${{ appointment.price || '0.00' }}</span>
             </div>
             <div v-if="appointment.instructions" class="detail-row">
-              <span class="detail-label">Instructions:</span>
+              <span class="detail-label">📝 Instructions:</span>
               <span class="detail-value">{{ appointment.instructions }}</span>
             </div>
           </div>
 
           <div class="appointment-actions">
-            <button v-if="appointment.status === 'pending'" 
+            <button v-if="canCancelAppointment(appointment)" 
                     @click="cancelAppointment(appointment.id)" 
                     class="action-btn cancel-btn">
+              Cancel
+            </button>
+            <button v-if="!canCancelAppointment(appointment) && appointment.status === 'pending'" 
+                    class="action-btn cancel-btn disabled" 
+                    disabled
+                    title="Cannot cancel past appointments">
               Cancel
             </button>
             <button v-if="appointment.status === 'completed'" 
                     @click="bookAgain(appointment)" 
                     class="action-btn book-again-btn">
               Book Again
+            </button>
+            <button v-if="canModifyAppointment(appointment)" 
+                    @click="rescheduleAppointment(appointment)" 
+                    class="action-btn reschedule-btn">
+              Reschedule
+            </button>
+            <button v-if="!canModifyAppointment(appointment) && (appointment.status === 'pending' || appointment.status === 'confirmed')" 
+                    class="action-btn reschedule-btn disabled" 
+                    disabled
+                    title="Cannot reschedule past appointments">
+              Reschedule
             </button>
             <button @click="viewDetails(appointment)" 
                     class="action-btn details-btn">
@@ -92,7 +125,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { appointmentApi, paymentApi } from '../services/api'
+import { appointmentApi, paymentApi, customerApi } from '../services/api'
 
 const router = useRouter()
 const route = useRoute()
@@ -106,9 +139,17 @@ const error = ref('')
 const filteredAppointments = computed(() => {
   let filtered = [...appointments.value]
   
+  console.log('All appointments:', appointments.value)
+  console.log('Filtered appointments before filtering:', filtered)
+  
+  // Filter out pending and cancelled appointments - only show confirmed and completed
+  filtered = filtered.filter(app => app.status === 'confirmed' || app.status === 'completed')
+  console.log('After removing pending/cancelled:', filtered)
+  
   // Filter by status
   if (statusFilter.value) {
     filtered = filtered.filter(app => app.status === statusFilter.value)
+    console.log('After status filter:', filtered)
   }
   
   // Sort appointments
@@ -125,8 +166,26 @@ const filteredAppointments = computed(() => {
     }
   })
   
+  console.log('Final filtered appointments:', filtered)
   return filtered
 })
+
+// Helper function to check if appointment is in the past
+const isAppointmentInPast = (appointment) => {
+  const appointmentDateTime = new Date(`${appointment.appointmentDate} ${appointment.appointmentTime}`)
+  const now = new Date()
+  return appointmentDateTime < now
+}
+
+// Helper function to check if appointment can be cancelled
+const canCancelAppointment = (appointment) => {
+  return appointment.status === 'pending' && !isAppointmentInPast(appointment)
+}
+
+// Helper function to check if appointment can be modified
+const canModifyAppointment = (appointment) => {
+  return (appointment.status === 'pending' || appointment.status === 'confirmed') && !isAppointmentInPast(appointment)
+}
 
 onMounted(async () => {
   // Check for payment success redirect
@@ -170,33 +229,78 @@ const handlePaymentSuccess = async (appointmentId) => {
   router.replace({ path: '/customer/appointments' })
 }
 
+// Update your loadAppointments function in CustomerAppointments.vue
 const loadAppointments = async () => {
   loading.value = true
   error.value = ''
   
   try {
-    const response = await appointmentApi.getCustomerAppointments()
+    const customerUser = JSON.parse(localStorage.getItem('customer_user') || '{}')
+    const customerId = customerUser.customerID || customerUser.id
     
-    // Transform API response to match our component structure
-    appointments.value = response.map(appointment => ({
-      id: appointment.appointmentID,
-      serviceName: appointment.service_rate?.service_type?.serviceTypeName || 'Unknown Service',
-      price: parseFloat(appointment.service_rate?.price || 0),
-      appointmentDate: appointment.appointmentDateTime?.split(' ')[0] || '',
-      appointmentTime: formatTime(appointment.appointmentDateTime?.split(' ')[1] || ''),
-      vehicleType: appointment.service_rate?.vehicle_size?.vehicleSizeDescription || 'Unknown Vehicle',
-      instructions: appointment.instructions || '',
-      status: appointment.status || 'pending'
+    if (!customerId) {
+      throw new Error('Customer ID not found. Please log in again.')
+    }
+    
+    const customerData = await customerApi.getCustomerWithAppointments(customerId)
+    const customerAppointments = customerData.appointments || []
+    
+    // Transform appointments and add payment status
+    appointments.value = await Promise.all(customerAppointments.map(async appointment => {
+      // Get payment data for this appointment
+      let paymentData = null
+      let paymentStatus = 'no_payment'
+      
+      try {
+        paymentData = await paymentApi.getPaymentByAppointment(appointment.id)
+        if (paymentData) {
+          paymentStatus = paymentData.status || 'pending'
+        }
+      } catch (paymentError) {
+        console.warn('Could not fetch payment for appointment:', appointment.id)
+      }
+      
+      return {
+        id: appointment.id,
+        service_rate_id: appointment.service_rate_id,
+        serviceName: appointment.service_rate?.service_type?.serviceTypeName || 'Unknown Service',
+        price: parseFloat(appointment.service_rate?.price || 0),
+        appointmentDate: appointment.datetime?.split(' ')[0] || '',
+        appointmentTime: formatTime(appointment.datetime?.split(' ')[1] || ''),
+        vehicleType: appointment.service_rate?.vehicle_size?.vehicleSizeDescription || 'Vehicle size not specified',
+        instructions: appointment.instructions || '',
+        status: appointment.status?.toLowerCase() || 'pending',
+        service_rate: appointment.service_rate,
+        // Payment information
+        paymentStatus: paymentStatus,
+        paymentData: paymentData,
+        paymentMethod: paymentData?.paymentMethod || '',
+        transactionID: paymentData?.transactionID || ''
+      }
     }))
     
   } catch (err) {
     console.error('Error loading appointments:', err)
     error.value = 'Failed to load appointments. Please try again.'
-    
-    // Fallback to empty array if API fails
     appointments.value = []
   } finally {
     loading.value = false
+  }
+}
+
+// Helper function to display payment status
+const getPaymentStatusText = (status) => {
+  switch (status?.toLowerCase()) {
+    case 'paid':
+      return 'PAID'
+    case 'pending':
+      return 'PENDING'
+    case 'failed':
+      return 'FAILED'
+    case 'no_payment':
+      return 'NO PAYMENT'
+    default:
+      return 'UNPAID'
   }
 }
 
@@ -234,14 +338,41 @@ const formatDate = (dateString) => {
 }
 
 const cancelAppointment = (appointmentId) => {
+  const appointment = appointments.value.find(app => app.id === appointmentId)
+  
+  if (!appointment) {
+    alert('Appointment not found')
+    return
+  }
+  
+  if (!canCancelAppointment(appointment)) {
+    alert('This appointment cannot be cancelled')
+    return
+  }
+  
   if (confirm('Are you sure you want to cancel this appointment?')) {
     // In real app, make API call to cancel appointment
-    const appointment = appointments.value.find(app => app.id === appointmentId)
-    if (appointment) {
-      appointment.status = 'cancelled'
-    }
+    appointment.status = 'cancelled'
     alert('Appointment cancelled successfully')
   }
+}
+
+const rescheduleAppointment = (appointment) => {
+  if (!canModifyAppointment(appointment)) {
+    alert('This appointment cannot be rescheduled')
+    return
+  }
+  
+  // Navigate to booking page with pre-filled service for rescheduling
+  router.push({
+    path: '/customer/book',
+    query: { 
+      service: appointment.serviceName,
+      reschedule: appointment.id,
+      currentDate: appointment.appointmentDate,
+      currentTime: appointment.appointmentTime
+    }
+  })
 }
 
 const bookAgain = (appointment) => {
@@ -352,6 +483,15 @@ const viewDetails = (appointment) => {
 
 .appointment-card.cancelled {
   border-left: 4px solid #ef4444;
+}
+
+.appointment-card.past-appointment {
+  opacity: 0.7;
+  background: #f9fafb;
+}
+
+.appointment-card.past-appointment .appointment-header h3 {
+  color: #6b7280;
 }
 
 .appointment-header {
@@ -465,6 +605,89 @@ const viewDetails = (appointment) => {
   background: #e5e7eb;
 }
 
+.reschedule-btn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.reschedule-btn:hover {
+  background: #fde68a;
+}
+
+.action-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f3f4f6 !important;
+  color: #9ca3af !important;
+}
+
+.action-btn.disabled:hover {
+  background: #f3f4f6 !important;
+  color: #9ca3af !important;
+}
+
+.loading-state {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;
+  border-top: 4px solid #2563eb;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-state p {
+  color: #6b7280;
+  font-size: 1.1rem;
+}
+
+.error-state {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.error-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+}
+
+.error-state h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #dc2626;
+  margin-bottom: 10px;
+}
+
+.error-state p {
+  color: #6b7280;
+  margin-bottom: 30px;
+}
+
+.retry-btn {
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.retry-btn:hover {
+  background: #b91c1c;
+}
+
 .empty-state {
   text-align: center;
   padding: 60px 20px;
@@ -537,3 +760,4 @@ const viewDetails = (appointment) => {
   }
 }
 </style>
+

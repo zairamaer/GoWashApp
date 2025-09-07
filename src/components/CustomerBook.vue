@@ -21,38 +21,12 @@
                 class="filter-btn"
                 :class="{ active: activeVehicleFilter === vehicleType.code }"
               >
-                {{ getVehicleDisplayName(vehicleType.description) }}
+                {{ vehicleType.description }}
               </button>
             </div>
           </div>
           
-          <div class="filter-group">
-            <label class="filter-label">Sort by:</label>
-            <select v-model="sortBy" @change="sortServices" class="sort-select">
-              <option value="name">Name (A-Z)</option>
-              <option value="price-low">Price (Low to High)</option>
-              <option value="price-high">Price (High to Low)</option>
-            </select>
-          </div>
           
-          <div class="filter-group">
-            <label class="filter-label">Price Range:</label>
-            <div class="price-range">
-              <input 
-                type="range" 
-                :min="minPrice" 
-                :max="maxPrice" 
-                v-model="priceFilter" 
-                @input="filterByPrice"
-                class="price-slider"
-              />
-              <div class="price-labels">
-                <span>${{ minPrice }}</span>
-                <span>${{ priceFilter }}</span>
-                <span>${{ maxPrice }}</span>
-              </div>
-            </div>
-          </div>
         </div>
         
         <!-- Loading State -->
@@ -81,14 +55,6 @@
             <h3>{{ service.name }}</h3>
             <p>{{ service.description }}</p>
             <div class="service-price">{{ getFilteredServicePrice(service) }}</div>
-            <div class="vehicle-sizes" v-if="service.vehicleSizes.length > 1">
-              <small v-if="getFilteredVehicleSizes(service).length > 0">
-                Available for: {{ getFilteredVehicleSizes(service).map(vs => getVehicleDisplayName(vs.description)).join(', ') }}
-              </small>
-              <small v-else class="no-vehicles">
-                Not available for selected vehicle type
-              </small>
-            </div>
           </div>
         </div>
 
@@ -120,12 +86,18 @@
               </div>
               <div class="form-group">
                 <label>Select Time</label>
-                <select v-model="bookingData.time">
+                <select v-model="bookingData.time" :disabled="loadingBookedTimes">
                   <option value="">Choose a time</option>
                   <option v-for="time in availableTimes" :key="time" :value="time">
                     {{ time }}
                   </option>
                 </select>
+                <div v-if="loadingBookedTimes" class="loading-times">
+                  <small>Loading available times...</small>
+                </div>
+                <div v-if="bookedTimes.length > 0" class="booked-times-info">
+                  <small>⚠️ Some time slots are unavailable</small>
+                </div>
               </div>
             </div>
             
@@ -149,7 +121,7 @@
               </div>
               <div class="summary-row">
                 <span>Vehicle Type:</span>
-                <span>{{ getVehicleDisplayName(selectedService.vehicleSizes.find(vs => vs.code === bookingData.vehicleType)?.description || '') }}</span>
+                <span>{{ selectedService.vehicleSizes.find(vs => vs.code === bookingData.vehicleType)?.description || '' }}</span>
               </div>
               <div class="summary-row">
                 <span>Date & Time:</span>
@@ -197,7 +169,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { serviceApi, appointmentApi, paymentApi } from '../services/api'
 
 const selectedService = ref(null)
@@ -217,23 +189,26 @@ const allServices = ref([])
 
 // Filter states
 const activeVehicleFilter = ref('all')
-const sortBy = ref('name')
-const priceFilter = ref(0)
-const minPrice = ref(0)
-const maxPrice = ref(1000)
 const availableVehicleTypes = ref([])
 
-const availableTimes = ref([
+const allAvailableTimes = [
   '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
   '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM',
   '05:00 PM', '06:00 PM'
-])
+]
+
+const bookedTimes = ref([])
+const loadingBookedTimes = ref(false)
 
 const minDate = computed(() => {
   const today = new Date()
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
   return tomorrow.toISOString().split('T')[0]
+})
+
+const availableTimes = computed(() => {
+  return allAvailableTimes.filter(time => !bookedTimes.value.includes(time))
 })
 
 const canBook = computed(() => {
@@ -320,7 +295,7 @@ const bookAppointment = async () => {
     const checkoutData = {
       appointmentID: appointmentId,
       amount: finalPrice,
-      description: `${selectedService.value.name} - ${getVehicleDisplayName(selectedService.value.vehicleSizes.find(vs => vs.code === bookingData.value.vehicleType)?.description || '')}`,
+      description: `${selectedService.value.name} - ${selectedService.value.vehicleSizes.find(vs => vs.code === bookingData.value.vehicleType)?.description || ''}`,
       success_url: `${window.location.origin}/customer/appointments?payment=success&appointment=${appointmentId}`,
       cancel_url: `${window.location.origin}/customer/book?payment=cancelled&appointment=${appointmentId}`
     }
@@ -407,12 +382,6 @@ const loadServices = async () => {
     })
     availableVehicleTypes.value = Array.from(vehicleTypesMap.values())
     
-    // Set price range
-    const prices = allServices.value.flatMap(service => service.vehicleSizes.map(vs => vs.price))
-    minPrice.value = Math.min(...prices)
-    maxPrice.value = Math.max(...prices)
-    priceFilter.value = maxPrice.value
-    
   } catch (err) {
     console.error('Error loading services:', err)
     error.value = 'Failed to load services. Please try again.'
@@ -446,43 +415,6 @@ const getVehicleSizePrice = (service, vehicleType) => {
   return vehicleSize ? vehicleSize.price : service.minPrice
 }
 
-const getVehicleDisplayName = (description) => {
-  // Extract just the vehicle name from descriptions like "GL Grandla/Commuter/L300"
-  // or "Sedan" or "SUV" etc.
-  
-  // If it's a simple name like "Sedan", "SUV", "Truck", return as is
-  if (['Sedan', 'SUV', 'Truck', 'Van', 'Hatchback', 'Coupe', 'Convertible'].includes(description)) {
-    return description
-  }
-  
-  // If it contains multiple vehicle names separated by "/", take the first one
-  if (description.includes('/')) {
-    return description.split('/')[0].trim()
-  }
-  
-  // If it contains vehicle size codes like "S", "M", "L", "XL", "XXL", extract the main vehicle type
-  const sizeCodes = ['S', 'M', 'L', 'XL', 'XXL']
-  const hasSizeCode = sizeCodes.some(code => description.includes(code))
-  
-  if (hasSizeCode) {
-    // Try to extract the main vehicle type from the description
-    const words = description.split(' ')
-    const vehicleTypes = ['Sedan', 'SUV', 'Truck', 'Van', 'Hatchback', 'Coupe', 'Convertible', 'Grandla', 'Commuter', 'L300']
-    
-    for (const word of words) {
-      if (vehicleTypes.some(type => word.includes(type))) {
-        return word
-      }
-    }
-    
-    // If no specific vehicle type found, return the first word
-    return words[0] || description
-  }
-  
-  // Default: return the first word or the full description if it's short
-  const words = description.split(' ')
-  return words.length > 2 ? words[0] : description
-}
 
 const getFilteredVehicleSizes = (service) => {
   // If no filter is active or "all" is selected, show all vehicle sizes
@@ -515,50 +447,20 @@ const getFilteredServicePrice = (service) => {
 // Filter functions
 const filterByVehicleType = (vehicleCode) => {
   activeVehicleFilter.value = vehicleCode
-  
-  if (vehicleCode === 'all') {
+  applyFilters()
+}
+
+
+
+const applyFilters = () => {
+  // Get the base filtered services (after vehicle type filtering)
+  if (activeVehicleFilter.value === 'all') {
     filteredServices.value = [...allServices.value]
   } else {
     filteredServices.value = allServices.value.filter(service => 
-      service.vehicleSizes.some(vs => vs.code === vehicleCode)
+      service.vehicleSizes.some(vs => vs.code === activeVehicleFilter.value)
     )
   }
-  
-  applyFilters()
-}
-
-const filterByPrice = () => {
-  applyFilters()
-}
-
-const sortServices = () => {
-  applyFilters()
-}
-
-const applyFilters = () => {
-  let filtered = [...filteredServices.value]
-  
-  // Apply price filter
-  filtered = filtered.filter(service => {
-    const minServicePrice = Math.min(...service.vehicleSizes.map(vs => vs.price))
-    return minServicePrice <= priceFilter.value
-  })
-  
-  // Apply sorting
-  filtered.sort((a, b) => {
-    switch (sortBy.value) {
-      case 'name':
-        return a.name.localeCompare(b.name)
-      case 'price-low':
-        return Math.min(...a.vehicleSizes.map(vs => vs.price)) - Math.min(...b.vehicleSizes.map(vs => vs.price))
-      case 'price-high':
-        return Math.min(...b.vehicleSizes.map(vs => vs.price)) - Math.min(...a.vehicleSizes.map(vs => vs.price))
-      default:
-        return 0
-    }
-  })
-  
-  filteredServices.value = filtered
 }
 
 // Payment-related functions
@@ -576,6 +478,59 @@ const formatDate = (dateString) => {
     day: 'numeric'
   })
 }
+
+
+// Function to convert 24-hour time to 12-hour format
+const convertTo12Hour = (time24h) => {
+  const [hours, minutes] = time24h.split(':')
+  const hour = parseInt(hours, 10)
+  const ampm = hour >= 12 ? 'PM' : 'AM'
+  const displayHour = hour % 12 || 12
+  
+  // Format with leading zero to match dropdown format
+  return `${displayHour.toString().padStart(2, '0')}:${minutes} ${ampm}`
+}
+
+// Function to fetch booked times for a specific date
+const fetchBookedTimes = async (date) => {
+  if (!date) {
+    bookedTimes.value = []
+    return
+  }
+  
+  loadingBookedTimes.value = true
+  
+  try {
+    const appointments = await appointmentApi.getAppointmentsByDate(date)
+    
+    // Filter confirmed appointments and extract times
+    const confirmedAppointments = appointments.filter(app => app.status === 'confirmed')
+    const bookedTimeSlots = confirmedAppointments.map(app => {
+      // Extract time from appointmentDateTime (format: "2025-09-26 18:00:00")
+      const time24h = app.appointmentDateTime.split(' ')[1].substring(0, 5) // Get "18:00"
+      return convertTo12Hour(time24h)
+    })
+    
+    bookedTimes.value = bookedTimeSlots
+    
+    // Clear selected time if it's now booked
+    if (bookingData.value.time && bookedTimeSlots.includes(bookingData.value.time)) {
+      bookingData.value.time = ''
+    }
+    
+  } catch (err) {
+    console.error('Error fetching booked times:', err)
+    // Don't show error to user, just log it and continue
+    bookedTimes.value = []
+  } finally {
+    loadingBookedTimes.value = false
+  }
+}
+
+// Watch for date changes to fetch booked times
+watch(() => bookingData.value.date, (newDate) => {
+  fetchBookedTimes(newDate)
+})
 
 onMounted(() => {
   loadServices()
@@ -710,10 +665,34 @@ onMounted(() => {
   border-color: #2563eb;
 }
 
+.form-group select option:disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.form-group select option:disabled:hover {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+}
+
 .form-group textarea {
   resize: vertical;
   min-height: 100px;
 }
+
+.loading-times {
+  margin-top: 5px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.booked-times-info {
+  margin-top: 5px;
+  color: #f59e0b;
+  font-size: 0.8rem;
+}
+
 
 .book-btn {
   background: #2563eb;
@@ -819,73 +798,7 @@ onMounted(() => {
   color: white;
 }
 
-.sort-select {
-  padding: 8px 12px;
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
-  background: white;
-  color: #374151;
-  font-size: 0.875rem;
-  cursor: pointer;
-  min-width: 200px;
-}
 
-.sort-select:focus {
-  outline: none;
-  border-color: #2563eb;
-}
-
-.price-range {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.price-slider {
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: #e5e7eb;
-  outline: none;
-  cursor: pointer;
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-.price-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #2563eb;
-  cursor: pointer;
-  border: 2px solid white;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.price-slider::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #2563eb;
-  cursor: pointer;
-  border: 2px solid white;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.price-labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.8rem;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.price-labels span:middle-child {
-  color: #2563eb;
-  font-weight: 600;
-}
 
 /* Loading and Error States */
 .loading-state, .error-state {
@@ -942,16 +855,6 @@ onMounted(() => {
   object-fit: cover;
 }
 
-.vehicle-sizes {
-  margin-top: 10px;
-  color: #6b7280;
-  font-size: 0.8rem;
-}
-
-.vehicle-sizes .no-vehicles {
-  color: #ef4444;
-  font-style: italic;
-}
 
 /* Selected Service Info */
 .selected-service-info {
@@ -1130,9 +1033,6 @@ onMounted(() => {
     font-size: 0.8rem;
   }
   
-  .sort-select {
-    min-width: 150px;
-  }
   
   .form-row {
     grid-template-columns: 1fr;
@@ -1178,9 +1078,6 @@ onMounted(() => {
     font-size: 0.75rem;
   }
   
-  .price-labels {
-    font-size: 0.75rem;
-  }
   
   .booking-section {
     padding: 12px;

@@ -4,6 +4,9 @@ import AdminLayout from '../components/AdminLayout.vue'
 import AdminDashboard from '../components/AdminDashboard.vue'
 import ServiceManagement from '../components/ServiceManagement.vue'
 import AppointmentsManagement from '../components/AppointmentsManagement.vue'
+import PaymentsManagement from '../components/PaymentsManagement.vue'
+import UpcomingSchedules from '../components/UpcomingSchedules.vue'
+import CustomerManagement from '../components/CustomerManagement.vue'
 import ApiTest from '../components/ApiTest.vue'
 import LandingPage from '../components/LandingPage.vue'
 import CustomerLogin from '../components/CustomerLogin.vue'
@@ -42,6 +45,21 @@ const routes = [
         path: 'appointments',
         name: 'AppointmentsManagement',
         component: AppointmentsManagement
+      },
+      {
+        path: 'payments',
+        name: 'PaymentsManagement',
+        component: PaymentsManagement
+      },
+      {
+        path: 'upcoming-schedules',
+        name: 'UpcomingSchedules',
+        component: UpcomingSchedules
+      },
+      {
+        path: 'customers',
+        name: 'CustomerManagement',
+        component: CustomerManagement
       }
     ]
   },

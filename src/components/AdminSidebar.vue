@@ -53,6 +53,16 @@
         </li>
 
         <li class="nav-item">
+          <router-link to="/admin/upcoming-schedules" class="nav-link" :class="{ active: $route.path.startsWith('/admin/upcoming-schedules') }">
+            <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12,6 12,12 16,14"/>
+            </svg>
+            <span v-if="!isCollapsed" class="nav-text">Upcoming Schedules</span>
+          </router-link>
+        </li>
+
+        <li class="nav-item">
           <router-link to="/admin/customers" class="nav-link" :class="{ active: $route.path.startsWith('/admin/customers') }">
             <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
