@@ -3,16 +3,25 @@
     <!-- Page Header -->
     <div class="page-header">
       <h1>Appointments Management</h1>
-      <p>View and manage completed customer appointments.</p>
+      <p>View and manage completed and cancelled customer appointments.</p>
     </div>
 
     <!-- Filters and Search -->
     <div class="filters-section">
       <div class="filters-row">
         <div class="filter-group">
+          <label>Status:</label>
+          <select v-model="statusFilter" @change="filterAppointments">
+            <option value="all">All (Completed & Cancelled)</option>
+            <option value="completed">Completed Only</option>
+            <option value="cancelled">Cancelled Only</option>
+          </select>
+        </div>
+        
+        <div class="filter-group">
           <label>Time Period:</label>
           <select v-model="timePeriod" @change="filterAppointments">
-            <option value="all">All Completed</option>
+            <option value="all">All</option>
             <option value="today">Today</option>
             <option value="week">This Week</option>
             <option value="month">This Month</option>
@@ -65,7 +74,6 @@
             <th>Status</th>
             <th>Price</th>
             <th>Notes</th>
-            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -95,7 +103,7 @@
               </div>
             </td>
             <td>
-              <span class="status-badge completed">
+              <span :class="['status-badge', appointment.status]">
                 {{ appointment.status }}
               </span>
             </td>
@@ -106,22 +114,6 @@
                   {{ appointment.notes.length > 30 ? appointment.notes.substring(0, 30) + '...' : appointment.notes }}
                 </span>
                 <span v-else class="no-notes">No notes</span>
-              </div>
-            </td>
-            <td>
-              <div class="action-buttons">
-                <button @click="editAppointment(appointment)" class="edit-btn" title="Edit">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                  </svg>
-                </button>
-                <button @click="deleteAppointment(appointment.appointmentID)" class="delete-btn" title="Delete">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3,6 5,6 21,6"/>
-                    <path d="M19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"/>
-                  </svg>
-                </button>
               </div>
             </td>
           </tr>
@@ -158,7 +150,7 @@
           
           <div class="form-group">
             <label>Status</label>
-            <span class="status-badge completed">
+            <span :class="['status-badge', appointmentForm.status]">
               {{ appointmentForm.status }}
             </span>
           </div>
@@ -190,8 +182,8 @@
         <line x1="8" y1="2" x2="8" y2="6"/>
         <line x1="3" y1="10" x2="21" y2="10"/>
       </svg>
-      <h3>No completed appointments found</h3>
-      <p>No completed appointments match your current filters.</p>
+      <h3>No appointments found</h3>
+      <p>No appointments match your current filters.</p>
     </div>
   </div>
 </template>
@@ -207,6 +199,7 @@ const vehicleSizes = ref([])
 const loading = ref(false)
 
 // Filters
+const statusFilter = ref('all') // New status filter
 const timePeriod = ref('all')
 const searchQuery = ref('')
 const sortBy = ref('date')
@@ -256,8 +249,13 @@ const monthOptions = computed(() => {
 const filteredAppointments = computed(() => {
   let filtered = appointments.value
 
-  // Filter to only show completed appointments
-  filtered = filtered.filter(apt => apt.status === 'completed')
+  // Filter by status (completed and/or cancelled)
+  if (statusFilter.value !== 'all') {
+    filtered = filtered.filter(apt => apt.status === statusFilter.value)
+  } else {
+    // Show only completed and cancelled appointments when "all" is selected
+    filtered = filtered.filter(apt => apt.status === 'completed' || apt.status === 'cancelled')
+  }
 
   // Filter by time period
   if (timePeriod.value !== 'all') {
@@ -382,15 +380,6 @@ const getVehicleSizeDescription = (vehicleSizeCode) => {
   return vehicleSize?.vehicleSizeDescription || vehicleSizeCode || 'Unknown'
 }
 
-
-const editAppointment = (appointment) => {
-  editingAppointment.value = appointment
-  appointmentForm.appointmentDateTime = formatDateTimeForInput(appointment.appointmentDateTime)
-  appointmentForm.status = appointment.status
-  appointmentForm.notes = appointment.notes || ''
-  showEditModal.value = true
-}
-
 const saveAppointment = async () => {
   try {
     await appointmentApi.updateAppointment(editingAppointment.value.appointmentID, appointmentForm)
@@ -407,18 +396,6 @@ const saveAppointment = async () => {
   } catch (error) {
     console.error('Error saving appointment:', error)
     alert('Failed to save appointment changes')
-  }
-}
-
-const deleteAppointment = async (id) => {
-  if (confirm('Are you sure you want to delete this appointment?')) {
-    try {
-      await appointmentApi.deleteAppointment(id)
-      appointments.value = appointments.value.filter(apt => apt.appointmentID !== id)
-    } catch (error) {
-      console.error('Error deleting appointment:', error)
-      alert('Failed to delete appointment')
-    }
   }
 }
 
@@ -448,7 +425,6 @@ const formatDateTimeForInput = (dateTimeString) => {
   return date.toISOString().slice(0, 16) // Format: YYYY-MM-DDTHH:MM
 }
 
-
 // Lifecycle
 onMounted(() => {
   loadData()
@@ -457,37 +433,66 @@ onMounted(() => {
 
 <style scoped>
 .appointments-management {
-  background: #f8fafc;
   min-height: calc(100vh - 64px);
+  padding: 24px;
 }
 
 .page-header {
   margin-bottom: 32px;
+  text-align: center;
+  padding: 48px 32px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.page-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
 }
 
 .page-header h1 {
-  color: #2d3748;
-  font-size: 28px;
-  font-weight: 700;
-  margin: 0 0 8px 0;
+  color: #1a202c;
+  font-size: 42px;
+  font-weight: 900;
+  margin: 0 0 16px 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
 }
 
 .page-header p {
-  color: #718096;
-  font-size: 16px;
+  color: #64748b;
+  font-size: 20px;
   margin: 0;
+  font-weight: 400;
+  opacity: 0.9;
 }
 
 .filters-section {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  padding: 24px;
-  margin-bottom: 24px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  padding: 32px;
+  margin-bottom: 32px;
 }
 
 .filters-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 24px;
   align-items: end;
 }
@@ -495,36 +500,47 @@ onMounted(() => {
 .filter-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-width: 200px;
+  gap: 10px;
 }
 
 .filter-group label {
-  color: #4a5568;
-  font-weight: 500;
+  color: #1a202c;
+  font-weight: 600;
   font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .filter-group input,
 .filter-group select {
-  padding: 10px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 14px;
-  transition: border-color 0.2s;
+  padding: 14px 18px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  background: white;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .filter-group input:focus,
 .filter-group select:focus {
   outline: none;
   border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+  transform: translateY(-1px);
+}
+
+.filter-group input::placeholder {
+  color: #a0aec0;
+  font-weight: 400;
 }
 
 .table-container {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   overflow-x: auto;
 }
@@ -536,103 +552,130 @@ onMounted(() => {
 }
 
 .data-table th {
-  background: #f7fafc;
-  color: #4a5568;
-  font-weight: 600;
-  padding: 12px 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%);
+  color: #2d3748;
+  font-weight: 700;
+  padding: 18px 20px;
   text-align: left;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 2px solid #e2e8f0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .data-table td {
-  padding: 12px 16px;
-  border-bottom: 1px solid #f1f5f9;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.5);
   color: #2d3748;
+  font-weight: 500;
+}
+
+.data-table tr {
+  transition: all 0.2s ease;
 }
 
 .data-table tr:hover {
-  background: #f8fafc;
+  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+  transform: scale(1.001);
 }
 
 .customer-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .customer-name {
-  font-weight: 600;
-  color: #2d3748;
+  font-weight: 700;
+  color: #1a202c;
+  font-size: 15px;
 }
 
 .customer-contact {
-  font-size: 12px;
+  font-size: 13px;
   color: #718096;
+  font-weight: 500;
 }
 
 .service-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .service-name {
-  font-weight: 600;
-  color: #2d3748;
+  font-weight: 700;
+  color: #1a202c;
+  font-size: 15px;
 }
 
 .service-description {
-  font-size: 12px;
+  font-size: 13px;
   color: #718096;
+  font-weight: 500;
 }
 
 .vehicle-size {
-  background: #e6fffa;
-  color: #319795;
-  padding: 4px 8px;
-  border-radius: 12px;
+  background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(66, 153, 225, 0.3);
 }
 
 .datetime-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .date {
-  font-weight: 600;
-  color: #2d3748;
+  font-weight: 700;
+  color: #1a202c;
+  font-size: 15px;
 }
 
 .time {
-  font-size: 12px;
+  font-size: 13px;
   color: #718096;
+  font-weight: 500;
 }
 
 .status-badge {
-  padding: 6px 12px;
-  border-radius: 12px;
+  padding: 10px 18px;
+  border-radius: 20px;
   font-size: 12px;
-  font-weight: 500;
-  text-transform: capitalize;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   display: inline-block;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.status-badge.cancelled {
+  background-color: #fee;
+  color: #c53030;
+  border: 1px solid #fed7d7;
 }
 
 .status-badge.confirmed {
-  background: #f0fff4;
-  color: #38a169;
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
 }
 
 .status-badge.completed {
-  background: #e6fffa;
-  color: #319795;
+  background: linear-gradient(135deg, #4fd1c7 0%, #319795 100%);
+  color: white;
 }
 
 .price-cell {
-  font-weight: 600;
+  font-weight: 700;
   color: #38a169;
+  font-size: 16px;
 }
 
 .notes-cell {
@@ -641,48 +684,18 @@ onMounted(() => {
 
 .has-notes {
   color: #4a5568;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .no-notes {
-  color: #a0aec0;
+  color: #cbd5e0;
   font-style: italic;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.action-buttons {
-  display: flex;
-  gap: 8px;
-}
 
-.edit-btn, .delete-btn {
-  border: none;
-  padding: 6px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.edit-btn {
-  background: #4299e1;
-  color: white;
-}
-
-.edit-btn:hover {
-  background: #3182ce;
-}
-
-.delete-btn {
-  background: #e53e3e;
-  color: white;
-}
-
-.delete-btn:hover {
-  background: #c53030;
-}
 
 .modal-overlay {
   position: fixed;
@@ -690,7 +703,8 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -699,66 +713,84 @@ onMounted(() => {
 
 .modal {
   background: white;
-  border-radius: 8px;
+  border-radius: 24px;
   width: 90%;
-  max-width: 500px;
+  max-width: 550px;
   max-height: 90vh;
   overflow-y: auto;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid #e2e8f0;
+  padding: 28px 32px;
+  border-bottom: 2px solid #f1f5f9;
+  background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%);
+  border-radius: 24px 24px 0 0;
 }
 
 .modal-header h3 {
-  color: #2d3748;
-  font-size: 18px;
-  font-weight: 600;
+  color: #1a202c;
+  font-size: 24px;
+  font-weight: 800;
   margin: 0;
+  letter-spacing: -0.5px;
 }
 
 .close-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
+  background: #f7fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 20px;
   color: #718096;
   cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
+  padding: 8px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #edf2f7;
+  color: #4a5568;
+  transform: scale(1.05);
 }
 
 .modal-form {
-  padding: 24px;
+  padding: 32px;
 }
 
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .form-group label {
   display: block;
-  color: #4a5568;
-  font-weight: 500;
-  margin-bottom: 6px;
+  color: #1a202c;
+  font-weight: 700;
+  margin-bottom: 8px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .form-group input,
 .form-group select,
 .form-group textarea {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 14px;
-  transition: border-color 0.2s;
+  padding: 14px 18px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  background: white;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .form-group input:focus,
@@ -766,47 +798,59 @@ onMounted(() => {
 .form-group textarea:focus {
   outline: none;
   border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+  transform: translateY(-1px);
 }
 
 .form-group input:disabled {
   background: #f7fafc;
   color: #718096;
+  border-color: #e2e8f0;
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
+  gap: 16px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 2px solid #f1f5f9;
 }
 
 .cancel-btn, .save-btn {
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-weight: 500;
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .cancel-btn {
   background: #f7fafc;
   color: #4a5568;
-  border: 1px solid #e2e8f0;
+  border: 2px solid #e2e8f0;
 }
 
 .cancel-btn:hover {
   background: #edf2f7;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .save-btn {
-  background: #667eea;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
 .save-btn:hover {
-  background: #5a67d8;
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
 
 .loading-state {
@@ -814,20 +858,22 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 80px 20px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
 .loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e2e8f0;
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(102, 126, 234, 0.2);
   border-top: 4px solid #667eea;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 @keyframes spin {
@@ -835,41 +881,67 @@ onMounted(() => {
   100% { transform: rotate(360deg); }
 }
 
+.loading-state p {
+  color: #4a5568;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 80px 20px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   color: #718096;
 }
 
 .empty-state svg {
-  margin-bottom: 16px;
-  opacity: 0.5;
+  margin-bottom: 20px;
+  opacity: 0.6;
+  stroke: #cbd5e0;
 }
 
 .empty-state h3 {
-  color: #4a5568;
-  margin: 0 0 8px 0;
+  color: #2d3748;
+  margin: 0 0 12px 0;
+  font-size: 20px;
+  font-weight: 700;
 }
 
 .empty-state p {
   margin: 0;
   text-align: center;
+  font-size: 16px;
+  font-weight: 500;
 }
 
 @media (max-width: 768px) {
-  .filters-row {
-    flex-direction: column;
-    gap: 16px;
+  .appointments-management {
+    padding: 16px;
   }
   
-  .filter-group {
-    min-width: auto;
+  .page-header h1 {
+    font-size: 32px;
+  }
+  
+  .page-header p {
+    font-size: 16px;
+  }
+  
+  .filters-section {
+    padding: 24px;
+  }
+  
+  .filters-row {
+    grid-template-columns: 1fr;
+    gap: 20px;
   }
   
   .data-table {
@@ -878,7 +950,40 @@ onMounted(() => {
   
   .data-table th,
   .data-table td {
-    padding: 8px 12px;
+    padding: 12px 16px;
+  }
+  
+  .modal {
+    margin: 16px;
+    width: calc(100% - 32px);
+  }
+  
+  .modal-form {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-header h1 {
+    font-size: 28px;
+  }
+  
+  .filters-section,
+  .table-container {
+    border-radius: 16px;
+  }
+  
+  .modal {
+    border-radius: 16px;
+  }
+  
+  .modal-header {
+    border-radius: 16px 16px 0 0;
+    padding: 20px 24px;
+  }
+  
+  .modal-header h3 {
+    font-size: 20px;
   }
 }
 </style>

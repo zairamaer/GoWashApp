@@ -4,9 +4,6 @@
     <div class="page-header">
       <h1>Service Management</h1>
       <p>Manage your car wash services, rates, and vehicle categories.</p>
-      <div class="debug-actions">
-        <button @click="testImageUrls" class="debug-btn">Test Image URLs</button>
-      </div>
     </div>
 
     <!-- Service Rates Section -->
@@ -104,15 +101,14 @@
               <td>
                 <div v-if="type.serviceTypeImage" class="service-image">
                   <img 
-                    :src="getImageUrl(type.serviceTypeImage)" 
+                    :src="type.serviceTypeImage" 
                     :alt="type.serviceTypeName"
                     @error="handleImageError"
                     @load="handleImageLoad"
                   />
                   <div class="image-debug">
                     <small><strong>ID:</strong> {{ type.serviceTypeID }}</small>
-                    <small><strong>Path:</strong> {{ type.serviceTypeImage }}</small>
-                    <small><strong>URL:</strong> {{ getImageUrl(type.serviceTypeImage) }}</small>
+                    <small><strong>URL:</strong> {{ type.serviceTypeImage }}</small>
                   </div>
                 </div>
                 <span v-else class="no-image">No image</span>
@@ -246,8 +242,8 @@
           <div class="form-group">
             <label>Service Image</label>
             <div class="image-upload-section">
-              <div v-if="serviceTypeForm.serviceTypeImage" class="current-image">
-                <img :src="getImageUrl(serviceTypeForm.serviceTypeImage)" :alt="serviceTypeForm.serviceTypeName" />
+              <div v-if="serviceTypeForm.serviceTypeImage && !imagePreview" class="current-image">
+                <img :src="serviceTypeForm.serviceTypeImage" :alt="serviceTypeForm.serviceTypeName" />
                 <button type="button" @click="removeImage" class="remove-image-btn">Remove</button>
               </div>
               <div v-if="imagePreview" class="image-preview">
@@ -319,7 +315,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { serviceApi, getImageUrl } from '../services/api'
+import { serviceApi } from '../services/api'
 
 // State
 const serviceRates = ref([])
@@ -373,13 +369,18 @@ const loadData = async () => {
     serviceTypes.value = typesData
     vehicleSizes.value = sizesData
     
+    // Debug: Log ALL service types data
+    console.log('=== ALL SERVICE TYPES DEBUG ===')
+    serviceTypes.value.forEach((type, index) => {
+      console.log(`[${index}] ID: ${type.serviceTypeID}`)
+      console.log(`[${index}] Name: ${type.serviceTypeName}`)
+      console.log(`[${index}] Image: ${type.serviceTypeImage}`)
+      console.log(`[${index}] Image Length: ${type.serviceTypeImage ? type.serviceTypeImage.length : 'null'}`)
+      console.log('---')
+    })
+    
     // Debug: Log service types with images
     console.log('Service Types with Images:', serviceTypes.value.filter(type => type.serviceTypeImage))
-    serviceTypes.value.forEach(type => {
-      if (type.serviceTypeImage) {
-        console.log(`ID: ${type.serviceTypeID} | Service: ${type.serviceTypeName} | Image: ${type.serviceTypeImage} | URL: ${getImageUrl(type.serviceTypeImage)}`)
-      }
-    })
   } catch (error) {
     console.error('Error loading data:', error)
   }
@@ -458,11 +459,10 @@ const saveServiceType = async () => {
     // Clear any previous errors
     uploadError.value = ''
     
-    // Prepare data for API call
+    // Prepare data for API call - match the expected structure
     const serviceTypeData = {
       serviceTypeName: serviceTypeForm.serviceTypeName.trim(),
-      serviceTypeDescription: serviceTypeForm.serviceTypeDescription.trim(),
-      serviceTypeImage: serviceTypeForm.serviceTypeImage // Keep existing image path
+      serviceTypeDescription: serviceTypeForm.serviceTypeDescription.trim()
     }
     
     // Add image file if a new one is selected
@@ -475,22 +475,25 @@ const saveServiceType = async () => {
       })
     } else {
       console.log('❌ NO NEW FILE SELECTED - Using existing image:', serviceTypeForm.serviceTypeImage)
-      // Don't include imageFile in the data if no new file is selected
-      delete serviceTypeData.imageFile
     }
     
-    console.log('Final service type data being sent:', serviceTypeData)
+    console.log('Final service type data being sent:', {
+      serviceTypeName: serviceTypeData.serviceTypeName,
+      serviceTypeDescription: serviceTypeData.serviceTypeDescription,
+      hasImageFile: !!serviceTypeData.imageFile
+    })
     
+    let result
     if (editingServiceType.value) {
       console.log('Updating existing service type...', {
         id: editingServiceType.value.serviceTypeID,
         data: serviceTypeData
       })
-      const result = await serviceApi.updateServiceType(editingServiceType.value.serviceTypeID, serviceTypeData)
+      result = await serviceApi.updateServiceType(editingServiceType.value.serviceTypeID, serviceTypeData)
       console.log('Update result:', result)
     } else {
       console.log('Creating new service type...', serviceTypeData)
-      const result = await serviceApi.createServiceType(serviceTypeData)
+      result = await serviceApi.createServiceType(serviceTypeData)
       console.log('Create result:', result)
     }
     
@@ -594,8 +597,7 @@ const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString()
 }
 
-// Image handling methods (using imported utility function)
-
+// Image handling methods
 const handleImageError = (event) => {
   console.warn('Image failed to load:', event.target.src)
   // Don't hide the image, show error state instead
@@ -610,13 +612,22 @@ const handleImageError = (event) => {
   errorDiv.style.textAlign = 'center'
   errorDiv.style.marginTop = '4px'
   
-  event.target.parentNode.appendChild(errorDiv)
+  if (!event.target.parentNode.querySelector('.image-error')) {
+    errorDiv.className = 'image-error'
+    event.target.parentNode.appendChild(errorDiv)
+  }
 }
 
 const handleImageLoad = (event) => {
   console.log('Image loaded successfully:', event.target.src)
   event.target.style.border = '2px solid #38a169'
   event.target.style.backgroundColor = '#f0fff4'
+  
+  // Remove any existing error messages
+  const errorDiv = event.target.parentNode.querySelector('.image-error')
+  if (errorDiv) {
+    errorDiv.remove()
+  }
 }
 
 const removeImage = () => {
@@ -701,22 +712,17 @@ const removeImagePreview = () => {
   }
 }
 
-// Removed uploadImage method - now handled directly in saveServiceType
-
 // Debug methods
 const testImageUrls = () => {
   console.log('=== Testing Image URLs ===')
   serviceTypes.value.forEach(type => {
     if (type.serviceTypeImage) {
-      const url = getImageUrl(type.serviceTypeImage)
       console.log(`ID: ${type.serviceTypeID} | Service: ${type.serviceTypeName}`)
-      console.log(`Original Path: ${type.serviceTypeImage}`)
-      console.log(`Generated URL: ${url}`)
+      console.log(`Image URL: ${type.serviceTypeImage}`)
       console.log('---')
     }
   })
 }
-
 
 // Lifecycle
 onMounted(() => {
@@ -726,168 +732,231 @@ onMounted(() => {
 
 <style scoped>
 .service-management {
-  background: #f8fafc;
   min-height: calc(100vh - 64px);
+  padding: 24px;
 }
 
 .page-header {
   margin-bottom: 32px;
+  text-align: center;
+  padding: 48px 32px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.page-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
 }
 
 .page-header h1 {
-  color: #2d3748;
-  font-size: 28px;
-  font-weight: 700;
-  margin: 0 0 8px 0;
+  color: #1a202c;
+  font-size: 42px;
+  font-weight: 900;
+  margin: 0 0 16px 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
 }
 
 .page-header p {
-  color: #718096;
-  font-size: 16px;
-  margin: 0 0 16px 0;
-}
-
-.debug-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.debug-btn {
-  background: #4299e1;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.debug-btn:hover {
-  background: #3182ce;
+  color: #64748b;
+  font-size: 20px;
+  margin: 0;
+  font-weight: 400;
+  opacity: 0.9;
 }
 
 .management-section {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  margin-bottom: 24px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(15px);
+  border-radius: 24px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  margin-bottom: 32px;
   overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.management-section:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.15);
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px;
-  border-bottom: 1px solid #e2e8f0;
-  background: #f7fafc;
+  padding: 32px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.3);
+  background: linear-gradient(135deg, rgba(247, 250, 252, 0.8), rgba(237, 242, 247, 0.8));
+  backdrop-filter: blur(10px);
 }
 
 .section-header h2 {
-  color: #2d3748;
-  font-size: 20px;
-  font-weight: 600;
+  color: #1a202c;
+  font-size: 24px;
+  font-weight: 700;
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-header h2::before {
+  content: '';
+  width: 4px;
+  height: 24px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 2px;
 }
 
 .add-btn {
-  background: #667eea;
+  background: linear-gradient(135deg, #667eea, #764ba2);
   color: white;
   border: none;
-  padding: 10px 16px;
-  border-radius: 6px;
-  font-weight: 500;
+  padding: 14px 24px;
+  border-radius: 12px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.3s ease;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  font-size: 14px;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
 }
 
 .add-btn:hover {
-  background: #5a67d8;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  background: linear-gradient(135deg, #5a67d8, #6b46c1);
+}
+
+.add-btn svg {
+  transition: transform 0.3s ease;
+}
+
+.add-btn:hover svg {
+  transform: rotate(90deg);
 }
 
 .table-container {
   overflow-x: auto;
+  margin: 0;
 }
 
 .data-table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 14px;
 }
 
 .data-table th {
-  background: #f7fafc;
-  color: #4a5568;
-  font-weight: 600;
-  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+  color: #2d3748;
+  font-weight: 700;
+  padding: 20px 24px;
   text-align: left;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 12px;
 }
 
 .data-table td {
-  padding: 12px 16px;
-  border-bottom: 1px solid #f1f5f9;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.3);
   color: #2d3748;
+  vertical-align: middle;
+}
+
+.data-table tr {
+  transition: all 0.3s ease;
 }
 
 .data-table tr:hover {
-  background: #f8fafc;
+  background: rgba(102, 126, 234, 0.05);
+  transform: scale(1.01);
 }
 
 .service-info, .vehicle-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
 }
 
 .service-name, .vehicle-code {
-  font-weight: 600;
-  color: #2d3748;
+  font-weight: 700;
+  color: #1a202c;
+  font-size: 15px;
 }
 
 .service-description, .vehicle-description {
-  font-size: 12px;
+  font-size: 13px;
   color: #718096;
+  font-weight: 500;
 }
 
 .price-cell {
-  font-weight: 600;
+  font-weight: 800;
   color: #38a169;
+  font-size: 16px;
+  background: rgba(56, 161, 105, 0.1);
+  padding: 8px 16px !important;
+  border-radius: 8px;
+  display: inline-block;
 }
 
 .service-name-cell, .size-code-cell {
-  font-weight: 600;
-  color: #2d3748;
+  font-weight: 700;
+  color: #1a202c;
+  font-size: 15px;
 }
 
 .service-image {
-  width: 60px;
-  height: 60px;
-  border-radius: 8px;
+  width: 80px;
+  height: 80px;
+  border-radius: 16px;
   overflow: hidden;
-  border: 2px solid #e2e8f0;
+  border: 3px solid rgba(102, 126, 234, 0.2);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #f7fafc;
+  background: linear-gradient(135deg, #f7fafc, #edf2f7);
   position: relative;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.service-image:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  border-color: rgba(102, 126, 234, 0.5);
 }
 
 .service-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.2s ease;
+  transition: transform 0.3s ease;
 }
 
 .service-image img:hover {
-  transform: scale(1.05);
+  transform: scale(1.1);
 }
 
 .no-image {
@@ -896,196 +965,229 @@ onMounted(() => {
   font-size: 12px;
   text-align: center;
   padding: 8px;
+  font-weight: 500;
 }
 
 .image-upload-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .current-image {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background: #f7fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  gap: 16px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(247, 250, 252, 0.8), rgba(237, 242, 247, 0.8));
+  border: 2px solid rgba(102, 126, 234, 0.2);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.current-image:hover {
+  border-color: rgba(102, 126, 234, 0.4);
+  transform: translateY(-2px);
 }
 
 .current-image img {
-  width: 60px;
-  height: 60px;
+  width: 80px;
+  height: 80px;
   object-fit: cover;
-  border-radius: 6px;
-  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
 .remove-image-btn {
-  background: #e53e3e;
+  background: linear-gradient(135deg, #e53e3e, #c53030);
   color: white;
   border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
+  padding: 8px 16px;
+  border-radius: 8px;
   font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(229, 62, 62, 0.3);
 }
 
 .remove-image-btn:hover {
-  background: #c53030;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(229, 62, 62, 0.4);
 }
 
 .image-input-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .image-help-text {
   color: #718096;
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.5;
+  font-weight: 500;
 }
 
-/* File Upload Styles */
 .file-upload-area {
-  border: 2px dashed #cbd5e0;
-  border-radius: 8px;
-  padding: 24px;
+  border: 3px dashed rgba(102, 126, 234, 0.3);
+  border-radius: 16px;
+  padding: 32px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.2s ease;
-  background: #f7fafc;
-  margin: 12px 0;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, rgba(247, 250, 252, 0.5), rgba(237, 242, 247, 0.5));
+  margin: 16px 0;
 }
 
 .file-upload-area:hover {
-  border-color: #667eea;
-  background: #edf2f7;
+  border-color: rgba(102, 126, 234, 0.6);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+  transform: translateY(-2px);
 }
 
 .file-upload-area.dragover {
   border-color: #667eea;
-  background: #e6fffa;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
   transform: scale(1.02);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.2);
 }
 
 .upload-content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .upload-content svg {
-  color: #a0aec0;
-  transition: color 0.2s ease;
+  color: rgba(102, 126, 234, 0.6);
+  transition: all 0.3s ease;
 }
 
 .file-upload-area:hover .upload-content svg {
   color: #667eea;
+  transform: translateY(-4px);
 }
 
 .upload-text {
-  font-weight: 500;
-  color: #4a5568;
+  font-weight: 600;
+  color: #2d3748;
   margin: 0;
+  font-size: 16px;
 }
 
 .upload-subtext {
-  font-size: 12px;
+  font-size: 14px;
   color: #718096;
   margin: 0;
+  font-weight: 500;
 }
 
 .image-preview {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background: #f0fff4;
-  border: 1px solid #9ae6b4;
-  border-radius: 8px;
-  margin: 12px 0;
+  gap: 16px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(240, 255, 244, 0.8), rgba(154, 230, 180, 0.1));
+  border: 2px solid rgba(154, 230, 180, 0.5);
+  border-radius: 12px;
+  margin: 16px 0;
+  transition: all 0.3s ease;
+}
+
+.image-preview:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(154, 230, 180, 0.2);
 }
 
 .image-preview img {
-  width: 60px;
-  height: 60px;
+  width: 80px;
+  height: 80px;
   object-fit: cover;
-  border-radius: 6px;
-  border: 1px solid #9ae6b4;
+  border-radius: 12px;
+  border: 2px solid rgba(154, 230, 180, 0.8);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
 .remove-preview-btn {
-  background: #e53e3e;
+  background: linear-gradient(135deg, #e53e3e, #c53030);
   color: white;
   border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
+  padding: 8px 16px;
+  border-radius: 8px;
   font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(229, 62, 62, 0.3);
 }
 
 .remove-preview-btn:hover {
-  background: #c53030;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(229, 62, 62, 0.4);
 }
 
 .upload-progress {
-  margin: 12px 0;
-  padding: 12px;
-  background: #f7fafc;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  margin: 16px 0;
+  padding: 16px;
+  background: rgba(247, 250, 252, 0.8);
+  border-radius: 12px;
+  border: 2px solid rgba(102, 126, 234, 0.2);
+  backdrop-filter: blur(10px);
 }
 
 .progress-bar {
   width: 100%;
-  height: 8px;
-  background: #e2e8f0;
-  border-radius: 4px;
+  height: 12px;
+  background: rgba(226, 232, 240, 0.5);
+  border-radius: 6px;
   overflow: hidden;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, #667eea, #764ba2);
   transition: width 0.3s ease;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
 .progress-text {
-  font-size: 12px;
-  color: #4a5568;
-  font-weight: 500;
+  font-size: 14px;
+  color: #2d3748;
+  font-weight: 600;
+  text-align: center;
 }
 
 .upload-error {
-  margin: 12px 0;
-  padding: 12px;
-  background: #fed7d7;
-  border: 1px solid #feb2b2;
-  border-radius: 8px;
+  margin: 16px 0;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(254, 215, 215, 0.8), rgba(254, 178, 178, 0.3));
+  border: 2px solid rgba(254, 178, 178, 0.8);
+  border-radius: 12px;
   color: #c53030;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
 }
 
 .image-debug {
   position: absolute;
-  bottom: -30px;
+  bottom: -40px;
   left: 0;
   right: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.9);
   color: white;
-  padding: 4px;
-  font-size: 8px;
-  border-radius: 4px;
+  padding: 8px;
+  font-size: 10px;
+  border-radius: 8px;
   z-index: 10;
   display: none;
+  backdrop-filter: blur(10px);
 }
 
 .service-image:hover .image-debug {
@@ -1100,36 +1202,40 @@ onMounted(() => {
 
 .action-buttons {
   display: flex;
-  gap: 8px;
+  gap: 12px;
+  align-items: center;
 }
 
 .edit-btn, .delete-btn {
   border: none;
-  padding: 6px;
-  border-radius: 4px;
+  padding: 10px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .edit-btn {
-  background: #4299e1;
+  background: linear-gradient(135deg, #4299e1, #3182ce);
   color: white;
 }
 
 .edit-btn:hover {
-  background: #3182ce;
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 4px 15px rgba(66, 153, 225, 0.4);
 }
 
 .delete-btn {
-  background: #e53e3e;
+  background: linear-gradient(135deg, #e53e3e, #c53030);
   color: white;
 }
 
 .delete-btn:hover {
-  background: #c53030;
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 4px 15px rgba(229, 62, 62, 0.4);
 }
 
 .modal-overlay {
@@ -1138,75 +1244,116 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .modal {
-  background: white;
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
   width: 90%;
-  max-width: 500px;
+  max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid #e2e8f0;
+  padding: 32px 32px 24px 32px;
+  border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
 }
 
 .modal-header h3 {
-  color: #2d3748;
-  font-size: 18px;
-  font-weight: 600;
+  color: #1a202c;
+  font-size: 24px;
+  font-weight: 700;
   margin: 0;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .close-btn {
-  background: none;
+  background: rgba(113, 128, 150, 0.1);
   border: none;
   font-size: 24px;
   color: #718096;
   cursor: pointer;
   padding: 0;
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.close-btn:hover {
+  background: rgba(229, 62, 62, 0.1);
+  color: #e53e3e;
+  transform: rotate(90deg);
 }
 
 .modal-form {
-  padding: 24px;
+  padding: 32px;
 }
 
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .form-group label {
   display: block;
-  color: #4a5568;
-  font-weight: 500;
-  margin-bottom: 6px;
+  color: #2d3748;
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .form-group input,
 .form-group select,
 .form-group textarea {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 14px;
-  transition: border-color 0.2s;
+  padding: 14px 16px;
+  border: 2px solid rgba(226, 232, 240, 0.5);
+  border-radius: 12px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  background: rgba(247, 250, 252, 0.5);
+  backdrop-filter: blur(10px);
+  font-weight: 500;
 }
 
 .form-group input:focus,
@@ -1214,58 +1361,250 @@ onMounted(() => {
 .form-group textarea:focus {
   outline: none;
   border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+  background: rgba(255, 255, 255, 0.8);
+  transform: translateY(-2px);
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
+  gap: 16px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 2px solid rgba(102, 126, 234, 0.1);
 }
 
 .cancel-btn, .save-btn {
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-weight: 500;
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .cancel-btn {
-  background: #f7fafc;
+  background: rgba(247, 250, 252, 0.8);
   color: #4a5568;
-  border: 1px solid #e2e8f0;
+  border: 2px solid rgba(226, 232, 240, 0.5);
+  backdrop-filter: blur(10px);
 }
 
 .cancel-btn:hover {
-  background: #edf2f7;
+  background: rgba(237, 242, 247, 0.8);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
 .save-btn {
-  background: #667eea;
+  background: linear-gradient(135deg, #667eea, #764ba2);
   color: white;
   border: none;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
 }
 
 .save-btn:hover {
-  background: #5a67d8;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  background: linear-gradient(135deg, #5a67d8, #6b46c1);
 }
 
+/* Responsive Design */
 @media (max-width: 768px) {
+  .service-management {
+    padding: 16px;
+  }
+  
+  .page-header {
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  
+  .page-header h1 {
+    font-size: 28px;
+  }
+  
+  .page-header p {
+    font-size: 16px;
+  }
+  
   .section-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 12px;
+    gap: 16px;
+    padding: 24px;
+  }
+  
+  .section-header h2 {
+    font-size: 20px;
   }
   
   .table-container {
-    font-size: 14px;
+    font-size: 13px;
   }
   
   .data-table th,
   .data-table td {
-    padding: 8px 12px;
+    padding: 16px 12px;
   }
+  
+  .service-image {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .current-image img,
+  .image-preview img {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .modal {
+    width: 95%;
+    margin: 16px;
+  }
+  
+  .modal-header {
+    padding: 24px 24px 20px 24px;
+  }
+  
+  .modal-header h3 {
+    font-size: 20px;
+  }
+  
+  .modal-form {
+    padding: 24px;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+  }
+  
+  .cancel-btn, .save-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .action-buttons {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .file-upload-area {
+    padding: 24px 16px;
+  }
+  
+  .upload-text {
+    font-size: 14px;
+  }
+  
+  .upload-subtext {
+    font-size: 12px;
+  }
+}
+
+/* Loading States */
+.loading {
+  opacity: 0.7;
+  pointer-events: none;
+  position: relative;
+}
+
+.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid #667eea;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Success States */
+.success-message {
+  background: linear-gradient(135deg, rgba(72, 187, 120, 0.1), rgba(56, 161, 105, 0.05));
+  color: #2f855a;
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: 2px solid rgba(72, 187, 120, 0.2);
+  font-weight: 600;
+  margin: 16px 0;
+  backdrop-filter: blur(10px);
+}
+
+/* Enhanced Table Responsiveness */
+@media (max-width: 1024px) {
+  .data-table {
+    font-size: 13px;
+  }
+  
+  .service-image {
+    width: 70px;
+    height: 70px;
+  }
+}
+
+/* Improved Focus States for Accessibility */
+.add-btn:focus,
+.edit-btn:focus,
+.delete-btn:focus,
+.save-btn:focus,
+.cancel-btn:focus {
+  outline: 3px solid rgba(102, 126, 234, 0.5);
+  outline-offset: 2px;
+}
+
+/* Table Column Specific Alignments */
+.data-table th:nth-child(3), /* Price/Image column */
+.data-table td:nth-child(3) {
+  text-align: center;
+}
+
+.data-table th:nth-child(4), /* Last Updated column */
+.data-table td:nth-child(4) {
+  text-align: center;
+}
+
+.data-table th:nth-child(5), /* Actions column */
+.data-table td:nth-child(5) {
+  text-align: center;
+}
+
+/* Ensure all table cells have consistent vertical alignment */
+.data-table td {
+  vertical-align: middle !important;
+}
+.management-section {
+  position: relative;
+  overflow: hidden;
+}
+
+.management-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.management-section:hover::before {
+  left: 100%;
 }
 </style>

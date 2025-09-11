@@ -463,12 +463,6 @@ const applyFilters = () => {
   }
 }
 
-// Payment-related functions
-const updatePaymentDetails = () => {
-  // This function is called when vehicle type changes to update payment details
-  // The payment summary will automatically update due to reactive data
-}
-
 const formatDate = (dateString) => {
   const date = new Date(dateString)
   return date.toLocaleDateString('en-US', {

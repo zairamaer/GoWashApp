@@ -82,7 +82,7 @@
           </router-link>
         </li>
 
-        <li class="nav-item">
+        <!-- <li class="nav-item">
           <router-link to="/admin/analytics" class="nav-link" :class="{ active: $route.path.startsWith('/admin/analytics') }">
             <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M18 20V10"/>
@@ -101,7 +101,7 @@
             </svg>
             <span v-if="!isCollapsed" class="nav-text">Settings</span>
           </router-link>
-        </li>
+        </li> -->
       </ul>
     </nav>
 

@@ -34,31 +34,40 @@ api.interceptors.request.use(
   }
 )
 
-// Response interceptor to handle auth errors
+// Response interceptor - FIXED VERSION
 api.interceptors.response.use(
   (response) => {
-    // Log successful responses for debugging
     console.log('API Response:', response.config.url, response.status, response.data)
     return response
   },
   (error) => {
-    // Log errors for debugging
     console.error('API Error:', error.config?.url, error.response?.status, error.response?.data)
     
     if (error.response?.status === 401) {
-      // Clear both admin and customer tokens
-      localStorage.removeItem('admin_token')
-      localStorage.removeItem('admin_user')
-      localStorage.removeItem('customer_token')
-      localStorage.removeItem('customer_user')
+      // Check if this is a login attempt (don't redirect on login failures)
+      const isLoginAttempt = error.config?.url?.includes('/login')
       
-      // Redirect based on current route
-      const currentPath = window.location.pathname
-      if (currentPath.startsWith('/admin')) {
-        window.location.href = '/admin/login'
-      } else if (currentPath.startsWith('/customer')) {
-        window.location.href = '/customer/login'
+      if (!isLoginAttempt) {
+        // Only redirect if NOT a login attempt (i.e., authenticated user's token expired)
+        localStorage.removeItem('admin_token')
+        localStorage.removeItem('admin_user')
+        localStorage.removeItem('customer_token')
+        localStorage.removeItem('customer_user')
+        
+        // Use Vue Router instead of window.location to prevent refresh
+        const currentPath = window.location.pathname
+        if (currentPath.startsWith('/admin')) {
+          // Import router dynamically to avoid circular dependencies
+          import('../router').then(({ default: router }) => {
+            router.push('/admin/login')
+          })
+        } else if (currentPath.startsWith('/customer')) {
+          import('../router').then(({ default: router }) => {
+            router.push('/customer/login')
+          })
+        }
       }
+      // For login attempts, just let the error pass through to the component
     }
     return Promise.reject(error)
   }

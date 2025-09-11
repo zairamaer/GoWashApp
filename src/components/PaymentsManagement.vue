@@ -22,19 +22,6 @@
       </div>
       
       <div class="summary-card">
-        <div class="card-icon pending">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12,6 12,12 16,14"/>
-          </svg>
-        </div>
-        <div class="card-content">
-          <h3>₱{{ totalPendingAmount.toFixed(2) }}</h3>
-          <p>Pending Payment ({{ pendingCount }} appointments)</p>
-        </div>
-      </div>
-      
-      <div class="summary-card">
         <div class="card-icon total">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="1" x2="12" y2="23"/>
@@ -50,16 +37,7 @@
 
     <!-- Filters and Search -->
     <div class="filters-section">
-      <div class="filters-row">
-        <div class="filter-group">
-          <label>Payment Status:</label>
-          <select v-model="paymentStatusFilter" @change="filterPayments">
-            <option value="all">All Payments</option>
-            <option value="paid">Paid</option>
-            <option value="pending">Pending</option>
-          </select>
-        </div>
-        
+      <div class="filters-row">        
         <div class="filter-group">
           <label>Time Period:</label>
           <select v-model="timePeriod" @change="filterPayments">
@@ -88,7 +66,6 @@
             <option value="customer">Customer Name</option>
             <option value="amount">Amount (Low to High)</option>
             <option value="amountDesc">Amount (High to Low)</option>
-            <option value="status">Payment Status</option>
           </select>
         </div>
       </div>
@@ -145,30 +122,6 @@
             </td>
             <td>
               <div class="action-buttons">
-                <button 
-                  v-if="getPaymentStatus(appointment) === 'Pending'"
-                  @click="markAsPaid(appointment)" 
-                  class="mark-paid-btn" 
-                  title="Mark as Paid"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 12l2 2 4-4"/>
-                    <circle cx="12" cy="12" r="9"/>
-                  </svg>
-                  Mark Paid
-                </button>
-                <button 
-                  v-if="getPaymentStatus(appointment) === 'Paid'"
-                  @click="markAsPending(appointment)" 
-                  class="mark-pending-btn" 
-                  title="Mark as Pending"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <polyline points="12,6 12,12 16,14"/>
-                  </svg>
-                  Mark Pending
-                </button>
                 <button @click="viewDetails(appointment)" class="view-btn" title="View Details">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -255,7 +208,19 @@
               </div>
               <div class="detail-item">
                 <label>Payment Date:</label>
-                <span>{{ getPaymentDate(selectedAppointment) ? formatDate(getPaymentDate(selectedAppointment)) : 'Not paid' }}</span>
+                <span>{{ formatDate(getPaymentDate(selectedAppointment)) }}</span>
+              </div>
+              <div class="detail-item" v-if="selectedAppointment.payment">
+                <label>Payment Method:</label>
+                <span>{{ selectedAppointment.payment.paymentMethod || 'N/A' }}</span>
+              </div>
+              <div class="detail-item" v-if="selectedAppointment.payment">
+                <label>Transaction ID:</label>
+                <span>{{ selectedAppointment.payment.transactionID || 'N/A' }}</span>
+              </div>
+              <div class="detail-item" v-if="selectedAppointment.payment">
+                <label>Payment Amount:</label>
+                <span class="amount">₱{{ parseFloat(selectedAppointment.payment.amount || 0).toFixed(2) }}</span>
               </div>
             </div>
           </div>
@@ -275,8 +240,8 @@
         <line x1="12" y1="1" x2="12" y2="23"/>
         <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
       </svg>
-      <h3>No payment records found</h3>
-      <p>No completed appointments match your current filters.</p>
+      <h3>No paid appointments found</h3>
+      <p>No paid appointments match your current filters.</p>
     </div>
   </div>
 </template>
@@ -293,7 +258,6 @@ const vehicleSizes = ref([])
 const loading = ref(false)
 
 // Filters
-const paymentStatusFilter = ref('all')
 const timePeriod = ref('all')
 const searchQuery = ref('')
 const sortBy = ref('dateDesc')
@@ -308,7 +272,8 @@ const completedAppointments = computed(() => {
 })
 
 const appointmentsWithPaymentStatus = computed(() => {
-  return completedAppointments.value.map(appointment => {
+  // Show all appointments, not just completed ones
+  return appointments.value.map(appointment => {
     // Find payment record for this appointment
     const payment = payments.value.find(p => p.appointmentID === appointment.appointmentID)
     return {
@@ -320,14 +285,6 @@ const appointmentsWithPaymentStatus = computed(() => {
 
 const filteredPayments = computed(() => {
   let filtered = appointmentsWithPaymentStatus.value
-
-  // Filter by payment status
-  if (paymentStatusFilter.value !== 'all') {
-    filtered = filtered.filter(apt => {
-      const status = getPaymentStatus(apt)
-      return status.toLowerCase() === paymentStatusFilter.value
-    })
-  }
 
   // Filter by time period
   if (timePeriod.value !== 'all') {
@@ -377,8 +334,6 @@ const filteredPayments = computed(() => {
         return parseFloat(a.service_rate?.price || 0) - parseFloat(b.service_rate?.price || 0)
       case 'amountDesc':
         return parseFloat(b.service_rate?.price || 0) - parseFloat(a.service_rate?.price || 0)
-      case 'status':
-        return getPaymentStatus(a).localeCompare(getPaymentStatus(b))
       default:
         return 0
     }
@@ -392,20 +347,10 @@ const paidCount = computed(() => {
   return appointmentsWithPaymentStatus.value.filter(apt => getPaymentStatus(apt) === 'Paid').length
 })
 
-const pendingCount = computed(() => {
-  return appointmentsWithPaymentStatus.value.filter(apt => getPaymentStatus(apt) === 'Pending').length
-})
-
 const totalPaidAmount = computed(() => {
-  return appointmentsWithPaymentStatus.value
-    .filter(apt => getPaymentStatus(apt) === 'Paid')
-    .reduce((total, apt) => total + parseFloat(apt.service_rate?.price || 0), 0)
-})
-
-const totalPendingAmount = computed(() => {
-  return appointmentsWithPaymentStatus.value
-    .filter(apt => getPaymentStatus(apt) === 'Pending')
-    .reduce((total, apt) => total + parseFloat(apt.service_rate?.price || 0), 0)
+  return payments.value
+    .filter(payment => payment.status === 'paid')
+    .reduce((total, payment) => total + parseFloat(payment.amount || 0), 0)
 })
 
 const totalRevenue = computed(() => {
@@ -424,10 +369,18 @@ const loadData = async () => {
       serviceApi.getVehicleSizes()
     ])
     
-    appointments.value = appointmentsData
-    payments.value = paymentsData
-    serviceTypes.value = typesData
-    vehicleSizes.value = sizesData
+    // Handle potential data wrapper structures
+    appointments.value = appointmentsData?.data || appointmentsData || []
+    payments.value = paymentsData?.data || paymentsData || []
+    serviceTypes.value = typesData?.data || typesData || []
+    vehicleSizes.value = sizesData?.data || sizesData || []
+    
+    console.log('Loaded data:', {
+      appointments: appointments.value.length,
+      payments: payments.value.length,
+      serviceTypes: serviceTypes.value.length,
+      vehicleSizes: vehicleSizes.value.length
+    })
   } catch (error) {
     console.error('Error loading data:', error)
   } finally {
@@ -443,13 +396,14 @@ const getPaymentStatus = (appointment) => {
     return 'Paid'
   }
   
-  // Default to pending for completed appointments
-  return 'Pending'
+  // Default to unpaid
+  return 'Unpaid'
 }
 
 const getPaymentDate = (appointment) => {
   const payment = payments.value.find(p => p.appointmentID === appointment.appointmentID)
-  return payment?.paid_at || payment?.updated_at || null
+  // Use paymentDateTime from your JSON structure, fallback to updated_at
+  return payment?.paymentDateTime || payment?.updated_at || null
 }
 
 const markAsPaid = async (appointment) => {
@@ -490,27 +444,7 @@ const markAsPaid = async (appointment) => {
   }
 }
 
-const markAsPending = async (appointment) => {
-  try {
-    const payment = payments.value.find(p => p.appointmentID === appointment.appointmentID)
-    
-    if (payment) {
-      const updatedPayment = await paymentApi.updatePayment(payment.paymentID, {
-        status: 'pending',
-        paid_at: null
-      })
-      
-      // Update local state
-      const index = payments.value.findIndex(p => p.paymentID === payment.paymentID)
-      if (index !== -1) {
-        payments.value[index] = updatedPayment
-      }
-    }
-  } catch (error) {
-    console.error('Error marking payment as pending:', error)
-    alert('Failed to update payment status')
-  }
-}
+
 
 const viewDetails = (appointment) => {
   selectedAppointment.value = appointment
@@ -558,127 +492,193 @@ onMounted(() => {
 
 <style scoped>
 .payments-management {
-  background: #f8fafc;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
   min-height: calc(100vh - 64px);
-  padding: 24px;
+  padding: 32px;
 }
 
 .page-header {
   margin-bottom: 32px;
+  text-align: center;
+  padding: 48px 32px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.page-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
 }
 
 .page-header h1 {
-  color: #2d3748;
-  font-size: 28px;
-  font-weight: 700;
-  margin: 0 0 8px 0;
+  color: #1a202c;
+  font-size: 42px;
+  font-weight: 900;
+  margin: 0 0 16px 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
 }
 
 .page-header p {
-  color: #718096;
-  font-size: 16px;
+  color: #64748b;
+  font-size: 20px;
   margin: 0;
+  font-weight: 400;
+  opacity: 0.9;
 }
 
 .summary-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 24px;
-  margin-bottom: 32px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 32px;
+  margin-bottom: 40px;
 }
 
 .summary-card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  padding: 24px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  padding: 32px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.summary-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.summary-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 20px 20px 0 0;
+}
+
+.summary-card:nth-child(1)::before {
+  background: linear-gradient(135deg, #10b981, #34d399);
+}
+
+.summary-card:nth-child(2)::before {
+  background: linear-gradient(135deg, #8b5cf6, #a78bfa);
 }
 
 .card-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
+  position: relative;
 }
 
 .card-icon.paid {
-  background: linear-gradient(135deg, #38a169, #48bb78);
-}
-
-.card-icon.pending {
-  background: linear-gradient(135deg, #ed8936, #f6ad55);
+  background: linear-gradient(135deg, #10b981, #34d399);
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
 }
 
 .card-icon.total {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+  box-shadow: 0 8px 20px rgba(139, 92, 246, 0.3);
 }
 
 .card-content h3 {
-  color: #2d3748;
-  font-size: 24px;
-  font-weight: 700;
-  margin: 0 0 4px 0;
+  color: #1e293b;
+  font-size: 28px;
+  font-weight: 800;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
 }
 
 .card-content p {
-  color: #718096;
-  font-size: 14px;
+  color: #64748b;
+  font-size: 15px;
   margin: 0;
+  font-weight: 500;
 }
 
 .filters-section {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  padding: 24px;
-  margin-bottom: 24px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  padding: 32px;
+  margin-bottom: 32px;
 }
 
 .filters-row {
   display: flex;
-  gap: 24px;
+  gap: 32px;
   align-items: end;
+  flex-wrap: wrap;
 }
 
 .filter-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-width: 200px;
+  gap: 12px;
+  min-width: 220px;
+  flex: 1;
 }
 
 .filter-group label {
-  color: #4a5568;
-  font-weight: 500;
+  color: #374151;
+  font-weight: 600;
   font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .filter-group input,
 .filter-group select {
-  padding: 10px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 14px;
-  transition: border-color 0.2s;
+  padding: 14px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  background: white;
 }
 
 .filter-group input:focus,
 .filter-group select:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
+  transform: translateY(-2px);
 }
 
 .table-container {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
   overflow: hidden;
   overflow-x: auto;
 }
@@ -690,156 +690,153 @@ onMounted(() => {
 }
 
 .data-table th {
-  background: #f7fafc;
-  color: #4a5568;
-  font-weight: 600;
-  padding: 12px 16px;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  color: #374151;
+  font-weight: 700;
+  padding: 20px 24px;
   text-align: left;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 2px solid #e5e7eb;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .data-table td {
-  padding: 12px 16px;
+  padding: 20px 24px;
   border-bottom: 1px solid #f1f5f9;
-  color: #2d3748;
+  color: #1e293b;
+  font-weight: 500;
+}
+
+.data-table tr {
+  transition: all 0.2s ease;
 }
 
 .data-table tr:hover {
-  background: #f8fafc;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  transform: scale(1.005);
 }
 
 .customer-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
 
 .customer-name {
-  font-weight: 600;
-  color: #2d3748;
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 16px;
 }
 
 .customer-contact {
-  font-size: 12px;
-  color: #718096;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.4;
 }
 
 .service-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
 
 .service-name {
-  font-weight: 600;
-  color: #2d3748;
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 15px;
 }
 
 .vehicle-size {
-  background: #e6fffa;
-  color: #319795;
-  padding: 2px 6px;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 500;
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  color: #059669;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
   display: inline-block;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1px solid #a7f3d0;
 }
 
 .datetime-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .date {
-  font-weight: 600;
-  color: #2d3748;
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 15px;
 }
 
 .time {
-  font-size: 12px;
-  color: #718096;
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
 }
 
 .amount-cell {
-  font-weight: 700;
-  color: #38a169;
-  font-size: 16px;
+  font-weight: 800;
+  color: #059669;
+  font-size: 18px;
+  letter-spacing: -0.5px;
 }
 
 .payment-status-badge {
-  padding: 6px 12px;
-  border-radius: 12px;
+  padding: 8px 16px;
+  border-radius: 20px;
   font-size: 12px;
-  font-weight: 500;
-  text-transform: capitalize;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   display: inline-block;
+  border: 2px solid transparent;
 }
 
 .payment-status-badge.paid {
-  background: #f0fff4;
-  color: #38a169;
-}
-
-.payment-status-badge.pending {
-  background: #fffbeb;
-  color: #ed8936;
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  color: #059669;
+  border-color: #a7f3d0;
 }
 
 .payment-date {
   font-size: 14px;
+  font-weight: 600;
+  color: #374151;
 }
 
 .no-payment {
-  color: #a0aec0;
+  color: #9ca3af;
   font-style: italic;
+  font-weight: 500;
 }
 
 .action-buttons {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
-}
-
-.mark-paid-btn, .mark-pending-btn, .view-btn {
-  border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.mark-paid-btn {
-  background: #38a169;
-  color: white;
-}
-
-.mark-paid-btn:hover {
-  background: #2f855a;
-}
-
-.mark-pending-btn {
-  background: #ed8936;
-  color: white;
-}
-
-.mark-pending-btn:hover {
-  background: #dd6b20;
 }
 
 .view-btn {
-  background: #4299e1;
+  border: none;
+  padding: 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #3b82f6, #60a5fa);
   color: white;
-  padding: 8px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .view-btn:hover {
-  background: #3182ce;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
 }
 
 .modal-overlay {
@@ -848,107 +845,148 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .modal {
   background: white;
-  border-radius: 12px;
+  border-radius: 24px;
   width: 90%;
-  max-width: 600px;
+  max-width: 700px;
   max-height: 90vh;
   overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px;
-  border-bottom: 1px solid #e2e8f0;
+  padding: 32px;
+  border-bottom: 2px solid #f1f5f9;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-radius: 24px 24px 0 0;
 }
 
 .modal-header h3 {
-  color: #2d3748;
-  font-size: 20px;
-  font-weight: 600;
+  color: #1e293b;
+  font-size: 24px;
+  font-weight: 800;
   margin: 0;
+  letter-spacing: -0.5px;
 }
 
 .close-btn {
-  background: none;
+  background: #ef4444;
   border: none;
-  font-size: 24px;
-  color: #718096;
+  font-size: 20px;
+  color: white;
   cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
+  padding: 8px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.close-btn:hover {
+  background: #dc2626;
+  transform: scale(1.1);
 }
 
 .modal-content {
-  padding: 24px;
+  padding: 32px;
 }
 
 .detail-section {
-  margin-bottom: 24px;
+  margin-bottom: 32px;
 }
 
 .detail-section h4 {
-  color: #2d3748;
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 12px 0;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #e2e8f0;
+  color: #1e293b;
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #e5e7eb;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .detail-grid {
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 
 .detail-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
 }
 
 .detail-item label {
-  color: #4a5568;
-  font-weight: 500;
+  color: #374151;
+  font-weight: 600;
   font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .detail-item span {
-  color: #2d3748;
-  font-size: 14px;
+  color: #1e293b;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .detail-item .amount {
-  font-weight: 700;
-  color: #38a169;
+  font-weight: 800;
+  color: #059669;
+  font-size: 16px;
 }
 
 .status-badge {
-  padding: 4px 8px;
-  border-radius: 8px;
+  padding: 6px 12px;
+  border-radius: 16px;
   font-size: 12px;
-  font-weight: 500;
-  text-transform: capitalize;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .status-badge.completed {
-  background: #e6fffa;
-  color: #319795;
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  color: #059669;
+  border: 1px solid #a7f3d0;
 }
 
 .loading-state {
@@ -956,20 +994,21 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 80px 20px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
 }
 
 .loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e2e8f0;
-  border-top: 4px solid #667eea;
+  width: 50px;
+  height: 50px;
+  border: 4px solid #e5e7eb;
+  border-top: 4px solid #8b5cf6;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 
 @keyframes spin {
@@ -977,41 +1016,59 @@ onMounted(() => {
   100% { transform: rotate(360deg); }
 }
 
+.loading-state p {
+  color: #64748b;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  color: #718096;
+  padding: 80px 20px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  color: #64748b;
 }
 
 .empty-state svg {
-  margin-bottom: 16px;
-  opacity: 0.5;
+  margin-bottom: 24px;
+  opacity: 0.6;
+  color: #9ca3af;
 }
 
 .empty-state h3 {
-  color: #4a5568;
-  margin: 0 0 8px 0;
+  color: #374151;
+  margin: 0 0 12px 0;
+  font-size: 20px;
+  font-weight: 700;
 }
 
 .empty-state p {
   margin: 0;
   text-align: center;
+  font-size: 16px;
+  font-weight: 500;
 }
 
 @media (max-width: 768px) {
+  .payments-management {
+    padding: 20px;
+  }
+  
   .summary-cards {
     grid-template-columns: 1fr;
+    gap: 20px;
   }
   
   .filters-row {
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
   }
   
   .filter-group {
@@ -1024,494 +1081,52 @@ onMounted(() => {
   
   .data-table th,
   .data-table td {
-    padding: 8px 12px;
+    padding: 12px 16px;
   }
   
   .action-buttons {
     flex-direction: column;
-    gap: 4px;
+    gap: 8px;
   }
   
-  .mark-paid-btn, .mark-pending-btn {
-    font-size: 11px;
-    padding: 4px 8px;
+  .modal {
+    width: 95%;
+    margin: 20px;
+  }
+  
+  .modal-header,
+  .modal-content {
+    padding: 20px;
+  }
+  
+  .page-header h1 {
+    font-size: 28px;
+  }
+  
+  .card-content h3 {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .summary-card {
+    padding: 24px;
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .card-icon {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .filters-section {
+    padding: 20px;
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: 8px 12px;
   }
 }
 </style>
-}
-
-.page-header {
-  margin-bottom: 32px;
-}
-
-.page-header h1 {
-  color: #2d3748;
-  font-size: 28px;
-  font-weight: 700;
-  margin: 0 0 8px 0;
-}
-
-.page-header p {
-  color: #718096;
-  font-size: 16px;
-  margin: 0;
-}
-
-.summary-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 24px;
-  margin-bottom: 32px;
-}
-
-.summary-card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  padding: 24px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.card-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-}
-
-.card-icon.paid {
-  background: linear-gradient(135deg, #38a169, #48bb78);
-}
-
-.card-icon.pending {
-  background: linear-gradient(135deg, #ed8936, #f6ad55);
-}
-
-.card-icon.total {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-}
-
-.card-content h3 {
-  color: #2d3748;
-  font-size: 24px;
-  font-weight: 700;
-  margin: 0 0 4px 0;
-}
-
-.card-content p {
-  color: #718096;
-  font-size: 14px;
-  margin: 0;
-}
-
-.filters-section {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  padding: 24px;
-  margin-bottom: 24px;
-}
-
-.filters-row {
-  display: flex;
-  gap: 24px;
-  align-items: end;
-}
-
-.filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 200px;
-}
-
-.filter-group label {
-  color: #4a5568;
-  font-weight: 500;
-  font-size: 14px;
-}
-
-.filter-group input,
-.filter-group select {
-  padding: 10px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 14px;
-  transition: border-color 0.2s;
-}
-
-.filter-group input:focus,
-.filter-group select:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.table-container {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  overflow-x: auto;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 1200px;
-}
-
-.data-table th {
-  background: #f7fafc;
-  color: #4a5568;
-  font-weight: 600;
-  padding: 12px 16px;
-  text-align: left;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.data-table td {
-  padding: 12px 16px;
-  border-bottom: 1px solid #f1f5f9;
-  color: #2d3748;
-}
-
-.data-table tr:hover {
-  background: #f8fafc;
-}
-
-.customer-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.customer-name {
-  font-weight: 600;
-  color: #2d3748;
-}
-
-.customer-contact {
-  font-size: 12px;
-  color: #718096;
-}
-
-.service-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.service-name {
-  font-weight: 600;
-  color: #2d3748;
-}
-
-.vehicle-size {
-  background: #e6fffa;
-  color: #319795;
-  padding: 2px 6px;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 500;
-  display: inline-block;
-}
-
-.datetime-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.date {
-  font-weight: 600;
-  color: #2d3748;
-}
-
-.time {
-  font-size: 12px;
-  color: #718096;
-}
-
-.amount-cell {
-  font-weight: 700;
-  color: #38a169;
-  font-size: 16px;
-}
-
-.payment-status-badge {
-  padding: 6px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: capitalize;
-  display: inline-block;
-}
-
-.payment-status-badge.paid {
-  background: #f0fff4;
-  color: #38a169;
-}
-
-.payment-status-badge.pending {
-  background: #fffbeb;
-  color: #ed8936;
-}
-
-.payment-date {
-  font-size: 14px;
-}
-
-.no-payment {
-  color: #a0aec0;
-  font-style: italic;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.mark-paid-btn, .mark-pending-btn, .view-btn {
-  border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.mark-paid-btn {
-  background: #38a169;
-  color: white;
-}
-
-.mark-paid-btn:hover {
-  background: #2f855a;
-}
-
-.mark-pending-btn {
-  background: #ed8936;
-  color: white;
-}
-
-.mark-pending-btn:hover {
-  background: #dd6b20;
-}
-
-.view-btn {
-  background: #4299e1;
-  color: white;
-  padding: 8px;
-}
-
-.view-btn:hover {
-  background: #3182ce;
-}
-
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal {
-  background: white;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 600px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.modal-header h3 {
-  color: #2d3748;
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
-  color: #718096;
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.modal-content {
-  padding: 24px;
-}
-
-.detail-section {
-  margin-bottom: 24px;
-}
-
-.detail-section h4 {
-  color: #2d3748;
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 12px 0;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.detail-grid {
-  display: grid;
-  gap: 12px;
-}
-
-.detail-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-}
-
-.detail-item label {
-  color: #4a5568;
-  font-weight: 500;
-  font-size: 14px;
-}
-
-.detail-item span {
-  color: #2d3748;
-  font-size: 14px;
-}
-
-.detail-item .amount {
-  font-weight: 700;
-  color: #38a169;
-}
-
-.status-badge {
-  padding: 4px 8px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: capitalize;
-}
-
-.status-badge.completed {
-  background: #e6fffa;
-  color: #319795;
-}
-
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e2e8f0;
-  border-top: 4px solid #667eea;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 16px;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  color: #718096;
-}
-
-.empty-state svg {
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-
-.empty-state h3 {
-  color: #4a5568;
-  margin: 0 0 8px 0;
-}
-
-.empty-state p {
-  margin: 0;
-  text-align: center;
-}
-
-@media (max-width: 768px) {
-  .summary-cards {
-    grid-template-columns: 1fr;
-  }
-  
-  .filters-row {
-    flex-direction: column;
-    gap: 16px;
-  }
-  
-  .filter-group {
-    min-width: auto;
-  }
-  
-  .data-table {
-    font-size: 14px;
-  }
-  
-  .data-table th,
-  .data-table td {
-    padding: 8px 12px;
-  }
-  
-  .action-buttons {
-    flex-direction: column;
-    gap: 4px;
-  }
-  
-  .mark-paid-btn, .mark-pending-btn {
-    font-size: 11px;
-    padding: 4px 8px;
-  }
-}
-

@@ -11,8 +11,11 @@
           <label>Filter by Status:</label>
           <select v-model="statusFilter" @change="filterAppointments">
             <option value="">All</option>
+            <option value="pending">Pending</option>
             <option value="confirmed">Confirmed</option>
+            <option value="in-progress">In Progress</option>
             <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
           </select>
         </div>
         <div class="filter-group">
@@ -142,10 +145,6 @@ const filteredAppointments = computed(() => {
   console.log('All appointments:', appointments.value)
   console.log('Filtered appointments before filtering:', filtered)
   
-  // Filter out pending and cancelled appointments - only show confirmed and completed
-  filtered = filtered.filter(app => app.status === 'confirmed' || app.status === 'completed')
-  console.log('After removing pending/cancelled:', filtered)
-  
   // Filter by status
   if (statusFilter.value) {
     filtered = filtered.filter(app => app.status === statusFilter.value)
@@ -201,6 +200,17 @@ const handlePaymentSuccess = async (appointmentId) => {
     // Check appointment status first
     let appointment = await appointmentApi.getAppointment(appointmentId)
     
+    // Update payment status to paid
+    try {
+      const payment = await paymentApi.getPaymentByAppointment(appointmentId)
+      if (payment) {
+        await paymentApi.markPaymentAsPaid(payment.paymentID)
+        console.log('Payment status updated to paid')
+      }
+    } catch (paymentError) {
+      console.error('Error updating payment status:', paymentError)
+    }
+    
     if (appointment && appointment.status === 'confirmed') {
       // Already confirmed by webhook
       alert('Payment successful! Your appointment has been confirmed.')
@@ -229,38 +239,36 @@ const handlePaymentSuccess = async (appointmentId) => {
   router.replace({ path: '/customer/appointments' })
 }
 
-// Update your loadAppointments function in CustomerAppointments.vue
 const loadAppointments = async () => {
   loading.value = true
   error.value = ''
   
   try {
+    // Get current customer ID from localStorage
     const customerUser = JSON.parse(localStorage.getItem('customer_user') || '{}')
     const customerId = customerUser.customerID || customerUser.id
+    
+    console.log('Customer ID from localStorage:', customerId)
+    console.log('Customer user data:', customerUser)
     
     if (!customerId) {
       throw new Error('Customer ID not found. Please log in again.')
     }
     
+    // Use the individual customer endpoint directly
+    console.log('Fetching customer with appointments...')
     const customerData = await customerApi.getCustomerWithAppointments(customerId)
-    const customerAppointments = customerData.appointments || []
+    console.log('Customer data response:', customerData)
     
-    // Transform appointments and add payment status
-    appointments.value = await Promise.all(customerAppointments.map(async appointment => {
-      // Get payment data for this appointment
-      let paymentData = null
-      let paymentStatus = 'no_payment'
+    // Get appointments for the current customer
+    const customerAppointments = customerData.appointments || []
+    console.log('Customer appointments:', customerAppointments)
+    
+    // Transform API response to match our component structure
+    appointments.value = customerAppointments.map(appointment => {
+      console.log('Processing appointment:', appointment)
       
-      try {
-        paymentData = await paymentApi.getPaymentByAppointment(appointment.id)
-        if (paymentData) {
-          paymentStatus = paymentData.status || 'pending'
-        }
-      } catch (paymentError) {
-        console.warn('Could not fetch payment for appointment:', appointment.id)
-      }
-      
-      return {
+      const transformedAppointment = {
         id: appointment.id,
         service_rate_id: appointment.service_rate_id,
         serviceName: appointment.service_rate?.service_type?.serviceTypeName || 'Unknown Service',
@@ -270,14 +278,15 @@ const loadAppointments = async () => {
         vehicleType: appointment.service_rate?.vehicle_size?.vehicleSizeDescription || 'Vehicle size not specified',
         instructions: appointment.instructions || '',
         status: appointment.status?.toLowerCase() || 'pending',
-        service_rate: appointment.service_rate,
-        // Payment information
-        paymentStatus: paymentStatus,
-        paymentData: paymentData,
-        paymentMethod: paymentData?.paymentMethod || '',
-        transactionID: paymentData?.transactionID || ''
+        service_rate: appointment.service_rate
       }
-    }))
+      
+      console.log('Transformed appointment:', transformedAppointment)
+      return transformedAppointment
+    })
+    
+    console.log('Final transformed appointments:', appointments.value)
+    console.log('Appointments length:', appointments.value.length)
     
   } catch (err) {
     console.error('Error loading appointments:', err)
@@ -285,22 +294,6 @@ const loadAppointments = async () => {
     appointments.value = []
   } finally {
     loading.value = false
-  }
-}
-
-// Helper function to display payment status
-const getPaymentStatusText = (status) => {
-  switch (status?.toLowerCase()) {
-    case 'paid':
-      return 'PAID'
-    case 'pending':
-      return 'PENDING'
-    case 'failed':
-      return 'FAILED'
-    case 'no_payment':
-      return 'NO PAYMENT'
-    default:
-      return 'UNPAID'
   }
 }
 
@@ -760,4 +753,3 @@ const viewDetails = (appointment) => {
   }
 }
 </style>
-

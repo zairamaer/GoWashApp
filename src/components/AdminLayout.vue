@@ -1,7 +1,7 @@
 <template>
   <div class="admin-layout">
     <!-- Sidebar -->
-    <AdminSidebar />
+    <AdminSidebar :class="{ 'mobile-open': isMobileSidebarOpen }" />
     
     <!-- Main Content Area -->
     <div class="main-content">
@@ -57,7 +57,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, provide } from 'vue'
 import { useRoute } from 'vue-router'
 import AdminSidebar from './AdminSidebar.vue'
 
@@ -69,6 +69,7 @@ const currentPageTitle = computed(() => {
     '/admin/dashboard': 'Dashboard',
     '/admin/services': 'Services',
     '/admin/appointments': 'Appointments',
+    '/admin/upcoming-schedules': 'Upcoming Schedules',
     '/admin/customers': 'Customers',
     '/admin/payments': 'Payments',
     '/admin/analytics': 'Analytics',
@@ -86,10 +87,20 @@ const closeMobileSidebar = () => {
   isMobileSidebarOpen.value = false
 }
 
+// Provide the close function to child components (sidebar can use this)
+provide('closeMobileSidebar', closeMobileSidebar)
+
 // Handle window resize
 const handleResize = () => {
   if (window.innerWidth > 768) {
     isMobileSidebarOpen.value = false
+  }
+}
+
+// Close sidebar when route changes (mobile navigation)
+const handleRouteChange = () => {
+  if (window.innerWidth <= 768) {
+    closeMobileSidebar()
   }
 }
 
@@ -100,6 +111,10 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
 })
+
+// Watch for route changes to close mobile sidebar
+import { watch } from 'vue'
+watch(() => route.path, handleRouteChange)
 </script>
 
 <style scoped>
@@ -107,6 +122,7 @@ onUnmounted(() => {
   display: flex;
   min-height: 100vh;
   background: #f8fafc;
+  position: relative;
 }
 
 .main-content {
@@ -232,7 +248,7 @@ onUnmounted(() => {
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 999;
+  z-index: 998;
   display: none;
 }
 
@@ -252,6 +268,7 @@ onUnmounted(() => {
   
   .top-header {
     padding: 0 16px;
+    z-index: 101;
   }
   
   .page-content {
@@ -263,7 +280,7 @@ onUnmounted(() => {
   }
 }
 
-/* Sidebar collapsed state */
+/* Sidebar collapsed state for desktop */
 .admin-layout:has(.admin-sidebar.collapsed) .main-content {
   margin-left: 70px;
 }
@@ -272,5 +289,32 @@ onUnmounted(() => {
   .admin-layout:has(.admin-sidebar.collapsed) .main-content {
     margin-left: 0;
   }
+}
+
+/* Mobile sidebar styles - these will be applied to the AdminSidebar component */
+@media (max-width: 768px) {
+  .admin-layout :deep(.admin-sidebar) {
+    position: fixed;
+    top: 0;
+    left: -260px;
+    z-index: 999;
+    transition: left 0.3s ease;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  
+  .admin-layout :deep(.admin-sidebar.mobile-open) {
+    left: 0;
+  }
+  
+  /* Ensure sidebar has proper background and shadow on mobile */
+  .admin-layout :deep(.admin-sidebar) {
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Smooth transitions */
+* {
+  transition: transform 0.3s ease, left 0.3s ease;
 }
 </style>

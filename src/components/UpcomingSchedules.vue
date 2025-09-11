@@ -16,6 +16,7 @@
             <option value="today">Today</option>
             <option value="week">This Week</option>
             <option value="month">This Month</option>
+            <option value="overdue">Overdue (Late)</option>
           </select>
         </div>
         
@@ -63,7 +64,10 @@
           v-for="appointment in filteredAppointments" 
           :key="appointment.appointmentID"
           class="schedule-card"
-          :class="{ 'past-appointment': isAppointmentInPast(appointment) }"
+          :class="{ 
+            'past-appointment': isAppointmentInPast(appointment),
+            'overdue-appointment': isAppointmentOverdue(appointment)
+          }"
         >
           <div class="schedule-header">
             <div class="appointment-info">
@@ -75,6 +79,9 @@
             <div class="appointment-datetime">
               <div class="date">{{ formatDate(appointment.appointmentDateTime) }}</div>
               <div class="time">{{ formatTime(appointment.appointmentDateTime) }}</div>
+              <div v-if="isAppointmentOverdue(appointment)" class="status-indicator">
+                <span class="overdue-badge">OVERDUE</span>
+              </div>
             </div>
           </div>
           
@@ -101,7 +108,6 @@
               <button 
                 @click="updateAppointmentStatus(appointment.appointmentID, 'completed')"
                 class="action-btn complete-btn"
-                :disabled="isAppointmentInPast(appointment)"
                 title="Mark as completed"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -226,6 +232,12 @@ const filteredAppointments = computed(() => {
           return aptDateOnly >= weekStart && aptDateOnly <= weekEnd
         case 'month':
           return aptDate.getMonth() === now.getMonth() && aptDate.getFullYear() === now.getFullYear()
+        case 'overdue':
+          return isAppointmentOverdue({ appointmentDateTime: apt.appointmentDateTime })
+        case 'expired':
+          // Since expired appointments are auto-cancelled, this will show empty results
+          // but kept for consistency in case you want to show recently auto-cancelled ones
+          return false
         default:
           return true
       }
@@ -269,7 +281,30 @@ const loadData = async () => {
       serviceApi.getVehicleSizes()
     ])
     
-    appointments.value = appointmentsData
+    // Auto-cancel expired appointments
+    const expiredAppointments = appointmentsData.filter(apt => isAppointmentExpired(apt))
+    
+    // Process auto-cancellations
+    if (expiredAppointments.length > 0) {
+      console.log(`Auto-cancelling ${expiredAppointments.length} expired appointments`)
+      
+      for (const appointment of expiredAppointments) {
+        try {
+          await appointmentApi.updateAppointment(appointment.appointmentID, { 
+            status: 'cancelled',
+            notes: (appointment.notes || '') + '\n[Auto-cancelled: 30+ minutes past scheduled time]'
+          })
+        } catch (error) {
+          console.error(`Failed to auto-cancel appointment ${appointment.appointmentID}:`, error)
+        }
+      }
+      
+      // Remove auto-cancelled appointments from the list
+      appointments.value = appointmentsData.filter(apt => !isAppointmentExpired(apt))
+    } else {
+      appointments.value = appointmentsData
+    }
+    
     serviceTypes.value = typesData
     vehicleSizes.value = sizesData
   } catch (error) {
@@ -302,6 +337,31 @@ const getVehicleSizeDescription = (vehicleSizeCode) => {
   return vehicleSize?.vehicleSizeDescription || vehicleSizeCode || 'Unknown'
 }
 
+// Helper method to check if appointment is overdue (past scheduled time but still within grace period)
+const isAppointmentOverdue = (appointment) => {
+  const appointmentDate = new Date(appointment.appointmentDateTime)
+  const now = new Date()
+  return now > appointmentDate
+}
+
+// Updated method with 30-minute grace period
+const isAppointmentExpired = (appointment) => {
+  const appointmentDate = new Date(appointment.appointmentDateTime)
+  const now = new Date()
+  
+  // Add 30 minutes (30 * 60 * 1000 milliseconds) grace period
+  const gracePeriod = 30 * 60 * 1000
+  const appointmentWithGrace = new Date(appointmentDate.getTime() + gracePeriod)
+  
+  return now > appointmentWithGrace
+}
+
+// Helper method to provide appropriate tooltip for the complete button
+const getCompleteButtonTooltip = (appointment) => {
+  return 'Mark as completed'
+}
+
+// Keep the old method for visual styling purposes (past appointments)
 const isAppointmentInPast = (appointment) => {
   const appointmentDate = new Date(appointment.appointmentDateTime)
   const now = new Date()
@@ -394,23 +454,50 @@ onMounted(() => {
 .upcoming-schedules {
   background: #f8fafc;
   min-height: calc(100vh - 64px);
+  padding: 24px;
 }
 
 .page-header {
   margin-bottom: 32px;
+  text-align: center;
+  padding: 48px 32px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.page-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
 }
 
 .page-header h1 {
-  color: #2d3748;
-  font-size: 28px;
-  font-weight: 700;
-  margin: 0 0 8px 0;
+  color: #1a202c;
+  font-size: 42px;
+  font-weight: 900;
+  margin: 0 0 16px 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
 }
 
 .page-header p {
-  color: #718096;
-  font-size: 16px;
+  color: #64748b;
+  font-size: 20px;
   margin: 0;
+  font-weight: 400;
+  opacity: 0.9;
 }
 
 .filters-section {
@@ -489,6 +576,27 @@ onMounted(() => {
   border-color: #d1d5db;
 }
 
+/* Status-specific card styling */
+.schedule-card.overdue-appointment {
+  border-color: #f6ad55;
+  background: #fffbeb;
+}
+
+.schedule-card.overdue-appointment:hover {
+  border-color: #ed8936;
+  box-shadow: 0 4px 12px rgba(246, 173, 85, 0.25);
+}
+
+.schedule-card.expired-appointment {
+  border-color: #fc8181;
+  background: #fef5f5;
+}
+
+.schedule-card.expired-appointment:hover {
+  border-color: #e53e3e;
+  box-shadow: 0 4px 12px rgba(252, 129, 129, 0.25);
+}
+
 .schedule-header {
   display: flex;
   justify-content: space-between;
@@ -534,6 +642,33 @@ onMounted(() => {
   color: #667eea;
   font-size: 14px;
   font-weight: 500;
+}
+
+/* Status indicator styles */
+.status-indicator {
+  margin-top: 8px;
+}
+
+.overdue-badge, .expired-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-block;
+}
+
+.overdue-badge {
+  background: #fed7aa;
+  color: #c2410c;
+  border: 1px solid #fb923c;
+}
+
+.expired-badge {
+  background: #fecaca;
+  color: #dc2626;
+  border: 1px solid #f87171;
 }
 
 .schedule-details {
@@ -649,6 +784,14 @@ onMounted(() => {
 .complete-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  background: #f7fafc;
+  color: #a0aec0;
+  border-color: #e2e8f0;
+}
+
+.complete-btn:disabled:hover {
+  background: #f7fafc;
+  border-color: #e2e8f0;
 }
 
 .cancel-btn {
@@ -822,7 +965,8 @@ onMounted(() => {
   margin-top: 24px;
 }
 
-.cancel-btn, .save-btn {
+.modal-actions .cancel-btn, 
+.modal-actions .save-btn {
   padding: 10px 20px;
   border-radius: 6px;
   font-weight: 500;
@@ -830,28 +974,32 @@ onMounted(() => {
   transition: all 0.2s;
 }
 
-.cancel-btn {
+.modal-actions .cancel-btn {
   background: #f7fafc;
   color: #4a5568;
   border: 1px solid #e2e8f0;
 }
 
-.cancel-btn:hover {
+.modal-actions .cancel-btn:hover {
   background: #edf2f7;
 }
 
-.save-btn {
+.modal-actions .save-btn {
   background: #667eea;
   color: white;
   border: none;
 }
 
-.save-btn:hover {
+.modal-actions .save-btn:hover {
   background: #5a67d8;
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
+  .upcoming-schedules {
+    padding: 16px;
+  }
+  
   .filters-row {
     flex-direction: column;
     gap: 16px;
