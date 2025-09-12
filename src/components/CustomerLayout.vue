@@ -35,15 +35,16 @@
       </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="customer-main">
-      <div class="main-container">
+    <!-- Main Content - Remove container constraints for dashboard and booking -->
+    <main class="customer-main" :class="{ 'full-width': isFullWidthPage }">
+      <div v-if="!isFullWidthPage" class="main-container">
         <router-view />
       </div>
+      <router-view v-else />
     </main>
 
-    <!-- Footer -->
-    <footer class="customer-footer">
+    <!-- Footer - Only show on non-full-width pages -->
+    <footer v-if="!isFullWidthPage" class="customer-footer">
       <div class="footer-container">
         <p>&copy; 2024 GoWash. All rights reserved.</p>
         <div class="footer-links">
@@ -57,15 +58,24 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { customerAuthService } from '../services/api'
 
 const router = useRouter()
+const route = useRoute()
+
 const customer = ref({
   name: '',
   email: '',
   phone: ''
+})
+
+// Check if current page should be full width (dashboard and booking)
+const isFullWidthPage = computed(() => {
+  return route.path === '/customer/dashboard' || 
+         route.path === '/customer/appointments' || 
+         route.path === '/customer/book'
 })
 
 onMounted(() => {
@@ -195,15 +205,23 @@ const handleLogout = async () => {
   background: #dc2626;
 }
 
+/* Main Content Styles */
 .customer-main {
   flex: 1;
-  padding: 40px 0;
+  background: #f8fafc;
 }
 
+/* Full width for dashboard and booking pages */
+.customer-main.full-width {
+  background: transparent;
+  padding: 0;
+}
+
+/* Container for other pages */
 .main-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 40px 20px;
 }
 
 .customer-footer {
@@ -249,6 +267,9 @@ const handleLogout = async () => {
   
   .header-nav {
     gap: 15px;
+    order: 3;
+    width: 100%;
+    justify-content: center;
   }
   
   .nav-link {
@@ -258,6 +279,10 @@ const handleLogout = async () => {
   
   .user-info {
     align-items: center;
+  }
+  
+  .user-menu {
+    order: 2;
   }
   
   .footer-container {
@@ -275,6 +300,7 @@ const handleLogout = async () => {
   .header-nav {
     flex-wrap: wrap;
     justify-content: center;
+    gap: 10px;
   }
   
   .nav-link {
@@ -286,7 +312,28 @@ const handleLogout = async () => {
     flex-direction: column;
     gap: 10px;
   }
+
+  .header-container {
+    padding: 10px 15px;
+  }
+
+  .main-container {
+    padding: 20px 15px;
+  }
+}
+
+/* Special styling for full-width pages header */
+.customer-layout:has(.customer-main.full-width) .customer-header {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.customer-layout:has(.customer-main.full-width) .header-container {
+  max-width: 1400px;
+}
+
+.customer-layout:has(.customer-main.full-width) .logo h2 {
+  color: #667eea;
 }
 </style>
-
-

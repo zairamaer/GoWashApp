@@ -1,555 +1,656 @@
 <template>
   <div class="customer-dashboard">
-    <div class="dashboard-header">
-      <h1>Welcome back, {{ customer.name }}!</h1>
-      <p>Manage your car wash appointments and services</p>
-    </div>
-
-    <div class="dashboard-grid">
-      <!-- Quick Actions -->
-      <div class="dashboard-card quick-actions">
-        <h3>Quick Actions</h3>
-        <div class="action-buttons">
-          <router-link to="/customer/book" class="action-btn primary">
-            <div class="btn-icon">📅</div>
-            <div class="btn-content">
-              <span class="btn-title">Book Appointment</span>
-              <span class="btn-subtitle">Schedule a new car wash</span>
-            </div>
-          </router-link>
-          <router-link to="/customer/appointments" class="action-btn secondary">
-            <div class="btn-icon">📋</div>
-            <div class="btn-content">
-              <span class="btn-title">View Appointments</span>
-              <span class="btn-subtitle">Check your bookings</span>
-            </div>
-          </router-link>
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+      <div class="hero-container">
+        <div class="hero-content">
+          <h1 class="hero-title">Welcome Back to GoWash</h1>
+          <p class="hero-subtitle">Manage your car wash appointments, view service history, and book new services with ease.</p>
+          <div class="hero-buttons">
+            <button @click="bookNewService" class="btn btn-primary">Book New Service</button>
+            <button @click="scrollToServices" class="btn btn-outline">View Services</button>
+          </div>
         </div>
-      </div>
-
-      <!-- Recent Appointments -->
-      <div class="dashboard-card recent-appointments">
-        <h3>Recent Appointments</h3>
-        <div v-if="recentAppointments.length > 0" class="appointments-list">
-          <div v-for="appointment in recentAppointments" :key="appointment.id" class="appointment-item">
-            <div class="appointment-info">
-              <div class="service-name">{{ appointment.serviceName }}</div>
-              <div class="appointment-date">{{ formatDate(appointment.appointmentDate) }}</div>
-              <div class="appointment-time">{{ appointment.appointmentTime }}</div>
-            </div>
-            <div class="appointment-status" :class="appointment.status">
-              {{ appointment.status }}
+        <div class="hero-visual">
+          <div class="car-container">
+            <div class="car-main">🚗</div>
+            <div class="wash-effects">
+              <div class="bubble" style="width: 20px; height: 20px; left: 20%; animation-delay: 0s;"></div>
+              <div class="bubble" style="width: 30px; height: 30px; left: 60%; animation-delay: 1s;"></div>
+              <div class="bubble" style="width: 25px; height: 25px; left: 40%; animation-delay: 2s;"></div>
+              <div class="bubble" style="width: 35px; height: 35px; left: 80%; animation-delay: 3s;"></div>
+              <div class="water-drop" style="width: 8px; height: 12px; left: 30%; animation-delay: 0.5s;"></div>
+              <div class="water-drop" style="width: 6px; height: 10px; left: 70%; animation-delay: 1.5s;"></div>
+              <div class="water-drop" style="width: 10px; height: 14px; left: 50%; animation-delay: 2.5s;"></div>
             </div>
           </div>
         </div>
-        <div v-else class="empty-state">
-          <div class="empty-icon">📅</div>
-          <p>No appointments yet</p>
-          <router-link to="/customer/book" class="empty-action">Book your first appointment</router-link>
-        </div>
       </div>
+    </section>
 
-      <!-- Services Overview -->
-      <div class="dashboard-card services-overview">
-        <h3>Available Services</h3>
-        <div class="services-list">
-          <div v-for="service in availableServices" :key="service.id" class="service-item">
-            <div class="service-icon">{{ service.icon }}</div>
-            <div class="service-details">
-              <div class="service-name">{{ service.name }}</div>
-              <div class="service-price">Starting at ${{ service.price }}</div>
+    <!-- Services Section -->
+    <section id="services" class="services">
+      <div class="services-container">
+        <h2 class="section-title">Our Services</h2>
+        <p class="section-subtitle">Choose from our premium car wash services</p>
+        
+        <div v-if="loading" class="loading-container">
+          <div class="loading-spinner"></div>
+          <p>Loading services...</p>
+        </div>
+        
+        <div v-else-if="error" class="error-container">
+          <p class="error-message">{{ error }}</p>
+          <button @click="loadServices" class="btn btn-primary">Retry</button>
+        </div>
+        
+        <div v-else class="services-grid">
+          <div 
+            v-for="service in limitedDisplayServices" 
+            :key="service.serviceTypeID" 
+            class="service-card"
+          >
+            <div class="service-image">
+              <img 
+                v-if="service.serviceTypeImage" 
+                :src="service.serviceTypeImage" 
+                :alt="service.serviceTypeName"
+                @error="handleImageError"
+              />
+              <div v-else class="service-placeholder">
+                <div class="service-icon">🚗</div>
+              </div>
+            </div>
+            
+            <div class="service-content">
+              <h3 class="service-title">{{ service.serviceTypeName }}</h3>
+              <p class="service-description">{{ service.serviceTypeDescription || 'Professional car wash service' }}</p>
+              
+              <div class="service-pricing">
+                <div class="price-range">
+                  <span class="price-from">Starting from</span>
+                  <span class="price-amount">${{ service.minPrice }}</span>
+                </div>
+                <div v-if="service.maxPrice > service.minPrice" class="price-range-text">
+                  Up to ${{ service.maxPrice }} for larger vehicles
+                </div>
+              </div>
             </div>
           </div>
         </div>
-        <router-link to="/customer/book" class="view-all-services">View All Services →</router-link>
-      </div>
 
-      <!-- Account Info -->
-      <div class="dashboard-card account-info">
-        <h3>Account Information</h3>
-        <div class="account-details">
-          <div class="detail-item">
-            <span class="detail-label">Name:</span>
-            <span class="detail-value">{{ customer.name }}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">Email:</span>
-            <span class="detail-value">{{ customer.email }}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">Phone:</span>
-            <span class="detail-value">{{ customer.phone }}</span>
-          </div>
+        <!-- View All Services Button -->
+        <div v-if="displayServices.length > 6" class="view-all-container">
+          <button @click="viewAllServices" class="btn btn-view-all">
+            View All Services
+          </button>
         </div>
-        <button class="edit-profile-btn">Edit Profile</button>
       </div>
-    </div>
+    </section>
 
-    <!-- Stats Cards -->
-    <div class="stats-section">
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon">📅</div>
-          <div class="stat-content">
-            <div class="stat-number">{{ totalAppointments }}</div>
-            <div class="stat-label">Total Appointments</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">✅</div>
-          <div class="stat-content">
-            <div class="stat-number">{{ completedAppointments }}</div>
-            <div class="stat-label">Completed</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">⏳</div>
-          <div class="stat-content">
-            <div class="stat-number">{{ pendingAppointments }}</div>
-            <div class="stat-label">Pending</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">💰</div>
-          <div class="stat-content">
-            <div class="stat-number">${{ totalSpent }}</div>
-            <div class="stat-label">Total Spent</div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { serviceApi } from '../services/api'
 
-const customer = ref({
-  name: '',
-  email: '',
-  phone: ''
-})
+// Router
+const router = useRouter()
 
-const recentAppointments = ref([])
-const availableServices = ref([
-  { id: 1, name: 'Basic Wash', price: 15, icon: '🚿' },
-  { id: 2, name: 'Premium Wash', price: 35, icon: '✨' },
-  { id: 3, name: 'Deluxe Package', price: 55, icon: '🏆' }
-])
+// Reactive state
+const loading = ref(false)
+const error = ref(null)
+const serviceTypes = ref([])
+const serviceRates = ref([])
 
-const totalAppointments = ref(0)
-const completedAppointments = ref(0)
-const pendingAppointments = ref(0)
-const totalSpent = ref(0)
-
-onMounted(() => {
-  // Load customer data from localStorage
-  const customerData = localStorage.getItem('customer_user')
-  if (customerData) {
-    customer.value = JSON.parse(customerData)
-  }
-  
-  // Load dashboard data
-  loadDashboardData()
-})
-
-const loadDashboardData = () => {
-  // This would typically load from API
-  // For now, using mock data
-  recentAppointments.value = [
-    {
-      id: 1,
-      serviceName: 'Premium Wash',
-      appointmentDate: '2024-01-15',
-      appointmentTime: '10:00 AM',
-      status: 'completed'
-    },
-    {
-      id: 2,
-      serviceName: 'Basic Wash',
-      appointmentDate: '2024-01-20',
-      appointmentTime: '2:00 PM',
-      status: 'pending'
+// Computed property for processed services
+const displayServices = computed(() => {
+  return serviceTypes.value.map(serviceType => {
+    // Find all rates for this service type
+    const ratesForType = serviceRates.value.filter(
+      rate => rate.serviceTypeID === serviceType.serviceTypeID
+    )
+    
+    // Calculate price range
+    let minPrice = 0
+    let maxPrice = 0
+    
+    if (ratesForType.length > 0) {
+      const prices = ratesForType.map(rate => parseFloat(rate.price))
+      minPrice = Math.min(...prices)
+      maxPrice = Math.max(...prices)
     }
-  ]
+    
+    return {
+      ...serviceType,
+      minPrice: minPrice.toFixed(0),
+      maxPrice: maxPrice.toFixed(0),
+      rates: ratesForType
+    }
+  })
+})
+
+// Computed property for limited services (only first 6)
+const limitedDisplayServices = computed(() => {
+  return displayServices.value.slice(0, 6)
+})
+
+// Methods
+const loadServices = async () => {
+  loading.value = true
+  error.value = null
   
-  totalAppointments.value = 5
-  completedAppointments.value = 3
-  pendingAppointments.value = 2
-  totalSpent.value = 150
+  try {
+    // Fetch both service types and service rates
+    const [serviceTypesResponse, serviceRatesResponse] = await Promise.all([
+      serviceApi.getServiceTypes(),
+      serviceApi.getServiceRates()
+    ])
+    
+    serviceTypes.value = serviceTypesResponse
+    serviceRates.value = serviceRatesResponse
+    
+    console.log('Services loaded:', displayServices.value)
+  } catch (err) {
+    console.error('Error loading services:', err)
+    error.value = 'Failed to load services. Please try again.'
+  } finally {
+    loading.value = false
+  }
 }
 
-const formatDate = (dateString) => {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
+const handleImageError = (event) => {
+  event.target.style.display = 'none'
 }
+
+const scrollToServices = () => {
+  const servicesSection = document.getElementById('services')
+  if (servicesSection) {
+    servicesSection.scrollIntoView({ behavior: 'smooth' })
+  }
+}
+
+const viewAllServices = () => {
+  console.log('Navigate to all services page')
+  router.push('/customer/book')
+}
+
+// Lifecycle
+onMounted(() => {
+  loadServices()
+})
 </script>
 
 <style scoped>
 .customer-dashboard {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  line-height: 1.6;
+  color: #333;
+  overflow-x: hidden;
+}
+
+/* Hero Section */
+.hero {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><circle cx="200" cy="200" r="100" fill="rgba(255,255,255,0.1)"/><circle cx="800" cy="300" r="150" fill="rgba(255,255,255,0.05)"/><circle cx="600" cy="700" r="120" fill="rgba(255,255,255,0.08)"/></svg>');
+  animation: float 20s ease-in-out infinite;
+}
+
+.hero-container {
   max-width: 1200px;
   margin: 0 auto;
-}
-
-.dashboard-header {
-  margin-bottom: 40px;
-}
-
-.dashboard-header h1 {
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: #1f2937;
-  margin-bottom: 8px;
-}
-
-.dashboard-header p {
-  color: #6b7280;
-  font-size: 1.1rem;
-}
-
-.dashboard-grid {
+  padding: 0 20px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 30px;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+  z-index: 2;
+  position: relative;
+}
+
+.hero-content {
+  color: white;
+}
+
+.hero-title {
+  font-size: 3.5rem;
+  font-weight: 800;
+  margin-bottom: 20px;
+  line-height: 1.1;
+  background: linear-gradient(135deg, #ffffff, #e0e7ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-subtitle {
+  font-size: 1.3rem;
+  margin-bottom: 40px;
+  opacity: 0.9;
+  line-height: 1.6;
+}
+
+.hero-buttons {
+  display: flex;
+  gap: 20px;
   margin-bottom: 40px;
 }
 
-.dashboard-card {
-  background: white;
-  border-radius: 12px;
-  padding: 30px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-  border: 1px solid #e5e7eb;
-}
-
-.dashboard-card h3 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 20px;
-}
-
-/* Quick Actions */
-.action-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.action-btn {
-  display: flex;
-  align-items: center;
-  padding: 20px;
-  border-radius: 8px;
+.btn {
+  display: inline-block;
+  padding: 15px 30px;
+  border-radius: 50px;
   text-decoration: none;
+  font-weight: 600;
   transition: all 0.3s ease;
   border: 2px solid transparent;
-}
-
-.action-btn.primary {
-  background: #eff6ff;
-  border-color: #dbeafe;
-  color: #1e40af;
-}
-
-.action-btn.primary:hover {
-  background: #dbeafe;
-  transform: translateY(-2px);
-}
-
-.action-btn.secondary {
-  background: #f9fafb;
-  border-color: #e5e7eb;
-  color: #374151;
-}
-
-.action-btn.secondary:hover {
-  background: #f3f4f6;
-  transform: translateY(-2px);
-}
-
-.btn-icon {
-  font-size: 2rem;
-  margin-right: 15px;
-}
-
-.btn-content {
-  display: flex;
-  flex-direction: column;
-}
-
-.btn-title {
-  font-weight: 600;
-  font-size: 1rem;
-  margin-bottom: 4px;
-}
-
-.btn-subtitle {
-  font-size: 0.875rem;
-  opacity: 0.8;
-}
-
-/* Recent Appointments */
-.appointments-list {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.appointment-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px;
-  background: #f9fafb;
-  border-radius: 8px;
-  border-left: 4px solid #2563eb;
-}
-
-.appointment-info {
-  flex: 1;
-}
-
-.service-name {
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 4px;
-}
-
-.appointment-date,
-.appointment-time {
-  font-size: 0.875rem;
-  color: #6b7280;
-}
-
-.appointment-status {
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.appointment-status.completed {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.appointment-status.pending {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.appointment-status.cancelled {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 40px 20px;
-}
-
-.empty-icon {
-  font-size: 3rem;
-  margin-bottom: 15px;
-}
-
-.empty-state p {
-  color: #6b7280;
-  margin-bottom: 15px;
-}
-
-.empty-action {
-  color: #2563eb;
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.empty-action:hover {
-  text-decoration: underline;
-}
-
-/* Services Overview */
-.services-list {
-  margin-bottom: 20px;
-}
-
-.service-item {
-  display: flex;
-  align-items: center;
-  padding: 15px 0;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.service-item:last-child {
-  border-bottom: none;
-}
-
-.service-icon {
-  font-size: 1.5rem;
-  margin-right: 15px;
-}
-
-.service-details {
-  flex: 1;
-}
-
-.service-name {
-  font-weight: 500;
-  color: #1f2937;
-  margin-bottom: 4px;
-}
-
-.service-price {
-  font-size: 0.875rem;
-  color: #2563eb;
-  font-weight: 600;
-}
-
-.view-all-services {
-  color: #2563eb;
-  text-decoration: none;
-  font-weight: 500;
-  font-size: 0.875rem;
-}
-
-.view-all-services:hover {
-  text-decoration: underline;
-}
-
-/* Account Info */
-.account-details {
-  margin-bottom: 20px;
-}
-
-.detail-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px 0;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.detail-item:last-child {
-  border-bottom: none;
-}
-
-.detail-label {
-  font-weight: 500;
-  color: #6b7280;
-}
-
-.detail-value {
-  color: #1f2937;
-}
-
-.edit-profile-btn {
-  background: #f3f4f6;
-  color: #374151;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  font-weight: 500;
+  position: relative;
+  overflow: hidden;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  background: none;
+  font-size: 1rem;
 }
 
-.edit-profile-btn:hover {
-  background: #e5e7eb;
+.btn-primary {
+  background: white;
+  color: #2563eb;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.2);
 }
 
-/* Stats Section */
-.stats-section {
+.btn-primary:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+}
+
+.btn-outline {
+  background: transparent;
+  color: white;
+  border-color: white;
+}
+
+.btn-outline:hover {
+  background: white;
+  color: #2563eb;
+}
+
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 0.9rem;
+}
+
+/* View All Services Button */
+.btn-view-all {
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  color: white;
+  border: none;
+  padding: 18px 40px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  border-radius: 50px;
+  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-view-all::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.btn-view-all:hover::before {
+  left: 100%;
+}
+
+.btn-view-all:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 40px rgba(37, 99, 235, 0.4);
+}
+
+.service-count {
+  font-size: 0.9rem;
+  opacity: 0.9;
+  margin-left: 8px;
+  font-weight: 500;
+}
+
+.view-all-container {
+  text-align: center;
+  margin-top: 60px;
+  padding-top: 40px;
+  border-top: 2px solid #e2e8f0;
+}
+
+/* Car Animation */
+.hero-visual {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.car-container {
+  position: relative;
+  width: 400px;
+  height: 300px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.car-main {
+  font-size: 10rem;
+  animation: carFloat 3s ease-in-out infinite;
+  filter: drop-shadow(0 20px 40px rgba(0,0,0,0.3));
+}
+
+.wash-effects {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.bubble {
+  position: absolute;
+  background: rgba(255,255,255,0.7);
+  border-radius: 50%;
+  animation: bubbleFloat 4s infinite;
+}
+
+.water-drop {
+  position: absolute;
+  background: rgba(135,206,250,0.8);
+  border-radius: 50%;
+  animation: dropFall 3s infinite;
+}
+
+/* Services Section */
+.services {
+  padding: 100px 0;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+.services-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.section-title {
+  font-size: 3rem;
+  font-weight: 800;
+  text-align: center;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.section-subtitle {
+  font-size: 1.2rem;
+  text-align: center;
+  color: #64748b;
+  margin-bottom: 60px;
+}
+
+.loading-container,
+.error-container {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #e2e8f0;
+  border-left: 4px solid #2563eb;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+.error-message {
+  color: #ef4444;
+  font-size: 1.1rem;
+  margin-bottom: 20px;
+}
+
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 30px;
   margin-top: 40px;
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
+.service-card {
+  background: white;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+  border: 1px solid #e2e8f0;
 }
 
-.stat-card {
-  background: white;
-  border-radius: 12px;
-  padding: 30px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-  border: 1px solid #e5e7eb;
+.service-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+}
+
+.service-image {
+  height: 200px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.service-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.service-card:hover .service-image img {
+  transform: scale(1.05);
+}
+
+.service-placeholder {
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
-  gap: 20px;
+  justify-content: center;
 }
 
-.stat-icon {
-  font-size: 2.5rem;
+.service-icon {
+  font-size: 4rem;
   opacity: 0.8;
 }
 
-.stat-content {
-  flex: 1;
+.service-content {
+  padding: 30px;
 }
 
-.stat-number {
-  font-size: 2rem;
+.service-title {
+  font-size: 1.5rem;
   font-weight: 700;
-  color: #1f2937;
-  margin-bottom: 4px;
+  color: #1e293b;
+  margin-bottom: 12px;
 }
 
-.stat-label {
-  color: #6b7280;
-  font-size: 0.875rem;
+.service-description {
+  color: #64748b;
+  line-height: 1.6;
+  margin-bottom: 20px;
+  font-size: 0.95rem;
+}
+
+.service-pricing {
+  margin-bottom: 25px;
+  padding: 15px;
+  background: #f8fafc;
+  border-radius: 12px;
+}
+
+.price-range {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.price-from {
+  font-size: 0.9rem;
+  color: #64748b;
   font-weight: 500;
+}
+
+.price-amount {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #2563eb;
+}
+
+.price-range-text {
+  font-size: 0.85rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(5deg); }
+}
+
+@keyframes carFloat {
+  0%, 100% { transform: translateY(0px) rotateY(0deg); }
+  50% { transform: translateY(-15px) rotateY(5deg); }
+}
+
+@keyframes bubbleFloat {
+  0% {
+    bottom: -20px;
+    opacity: 0;
+    transform: translateX(0) scale(0);
+  }
+  10% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    bottom: 100%;
+    opacity: 0;
+    transform: translateX(20px) scale(0.5);
+  }
+}
+
+@keyframes dropFall {
+  0% {
+    top: -10px;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
-  .dashboard-grid {
+  .hero-container {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+  
+  .hero-title {
+    font-size: 2.5rem;
+  }
+  
+  .hero-buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .services-grid {
     grid-template-columns: 1fr;
   }
   
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .car-main {
+    font-size: 8rem;
   }
   
-  .action-buttons {
-    gap: 10px;
+  .section-title {
+    font-size: 2.2rem;
   }
   
-  .action-btn {
-    padding: 15px;
-  }
-  
-  .btn-icon {
-    font-size: 1.5rem;
-    margin-right: 10px;
+  .btn-view-all {
+    padding: 15px 30px;
+    font-size: 1rem;
   }
 }
 
 @media (max-width: 480px) {
-  .dashboard-header h1 {
+  .hero-title {
     font-size: 2rem;
   }
   
-  .stats-grid {
+  .hero-subtitle {
+    font-size: 1.1rem;
+  }
+  
+  .car-main {
+    font-size: 6rem;
+  }
+  
+  .section-title {
+    font-size: 1.8rem;
+  }
+  
+  .services-grid {
     grid-template-columns: 1fr;
   }
   
-  .stat-card {
-    padding: 20px;
-  }
-  
-  .appointment-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
+  .view-all-container {
+    margin-top: 40px;
+    padding-top: 30px;
   }
 }
 </style>
-
-
