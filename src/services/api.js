@@ -184,7 +184,6 @@ export const serviceApi = {
 
   async createServiceType(serviceTypeData) {
     try {
-      console.log('Creating service type with direct service-types endpoint:', serviceTypeData)
       
       const formData = new FormData()
       
@@ -195,14 +194,8 @@ export const serviceApi = {
       // Add image file if present
       if (serviceTypeData.imageFile) {
         formData.append('serviceTypeImage', serviceTypeData.imageFile)
-        console.log('Image file added to FormData:', serviceTypeData.imageFile.name)
       }
       
-      console.log('FormData contents:', {
-        serviceTypeName: serviceTypeData.serviceTypeName,
-        serviceTypeDescription: serviceTypeData.serviceTypeDescription,
-        hasImageFile: !!serviceTypeData.imageFile
-      })
       
       // Create service type directly with image
       const response = await api.post('/service-types', formData, {
@@ -211,7 +204,6 @@ export const serviceApi = {
         }
       })
       
-      console.log('Service type created successfully:', response.data)
       return response.data
     } catch (error) {
       console.error('Error creating service type:', error)
@@ -221,23 +213,12 @@ export const serviceApi = {
 
   async updateServiceType(id, serviceTypeData) {
     try {
-      console.log('=== UPDATE SERVICE TYPE START ===')
-      console.log('ID:', id)
-      console.log('Service Type Data:', serviceTypeData)
-      console.log('Has image file:', !!serviceTypeData.imageFile)
       
       // If there's an image file, use FormData
       if (serviceTypeData.imageFile) {
-        console.log('=== UPDATING WITH IMAGE FILE ===')
         
         // Validate file before sending
         const file = serviceTypeData.imageFile
-        console.log('File details:', {
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          lastModified: file.lastModified
-        })
         
         // Check file size (2MB limit)
         if (file.size > 2048 * 1024) {
@@ -256,17 +237,6 @@ export const serviceApi = {
         formData.append('serviceTypeImage', serviceTypeData.imageFile)
         formData.append('_method', 'PUT')
         
-        // Debug: Log all FormData entries
-        console.log('=== FORM DATA CONTENTS ===')
-        for (let [key, value] of formData.entries()) {
-          if (value instanceof File) {
-            console.log(`${key}:`, { name: value.name, size: value.size, type: value.type })
-          } else {
-            console.log(`${key}:`, value)
-          }
-        }
-        
-        console.log(`Making POST request to: /service-types/${id}`)
         
         const response = await api.post(`/service-types/${id}`, formData, {
           headers: {
@@ -279,15 +249,8 @@ export const serviceApi = {
           }
         })
         
-        console.log('=== RESPONSE RECEIVED ===')
-        console.log('Status:', response.status)
-        console.log('Status Text:', response.statusText)
-        console.log('Response Data:', response.data)
-        console.log('Response Headers:', response.headers)
         
         if (response.status === 422) {
-          console.log('=== VALIDATION ERRORS ===')
-          console.log('Errors object:', response.data.errors)
           const errors = response.data.errors || {}
           const errorMessages = Object.entries(errors).map(([field, messages]) => 
             `${field}: ${messages.join(', ')}`
@@ -299,19 +262,15 @@ export const serviceApi = {
           throw new Error(`Server responded with status ${response.status}: ${response.data.message || response.statusText}`)
         }
         
-        console.log('✅ Update with image successful')
         return response.data
         
       } else {
-        console.log('=== UPDATING WITHOUT IMAGE FILE ===')
         
         const updateData = {
           serviceTypeName: serviceTypeData.serviceTypeName,
           serviceTypeDescription: serviceTypeData.serviceTypeDescription || ''
         }
         
-        console.log('JSON data for update:', updateData)
-        console.log(`Making PUT request to: /service-types/${id}`)
         
         const response = await api.put(`/service-types/${id}`, updateData, {
           headers: {
@@ -323,9 +282,6 @@ export const serviceApi = {
           }
         })
         
-        console.log('=== RESPONSE RECEIVED (JSON) ===')
-        console.log('Status:', response.status)
-        console.log('Response Data:', response.data)
         
         if (response.status === 422) {
           const errors = response.data.errors || {}
@@ -339,16 +295,9 @@ export const serviceApi = {
           throw new Error(`Server responded with status ${response.status}: ${response.data.message || response.statusText}`)
         }
         
-        console.log('✅ Update without image successful')
         return response.data
       }
     } catch (error) {
-      console.log('=== ERROR CAUGHT ===')
-      console.log('Error object:', error)
-      console.log('Error message:', error.message)
-      console.log('Error code:', error.code)
-      console.log('Error response:', error.response)
-      console.log('Error config:', error.config)
       
       // If it's our custom error, re-throw it
       if (error.message.includes('Validation failed') || 
@@ -372,23 +321,19 @@ export const serviceApi = {
 
   async deleteServiceType(id) {
     try {
-      console.log('Deleting service type and related service rates:', id)
       
       // First, get all service rates for this service type
       const serviceRates = await this.getServiceRates()
       const relatedRates = serviceRates.filter(rate => rate.serviceTypeID == id)
       
-      console.log('Found related service rates:', relatedRates.length)
       
       // Delete all related service rates first
       for (const rate of relatedRates) {
-        console.log('Deleting service rate:', rate.serviceRateID)
         await api.delete(`/service-rates/${rate.serviceRateID}`)
       }
       
       // Then delete the service type
       const response = await api.delete(`/service-types/${id}`)
-      console.log('Service type deleted successfully')
       return response.data
     } catch (error) {
       console.error('Error deleting service type:', error)
@@ -448,7 +393,6 @@ export const customerApi = {
       return response.data.data || response.data
     } catch (error) {
       // If individual endpoint fails, get all customers and filter
-      console.log('Individual customer endpoint failed, using all customers endpoint')
       const allCustomers = await this.getCustomers()
       const customer = allCustomers.find(c => c.id == customerId)
       if (!customer) {
@@ -615,7 +559,6 @@ export const paymentApi = {
     
     try {
       const response = await api.put(`/payments/${paymentId}`, paymentData)
-      console.log('Payment marked as paid:', response.data)
       return response.data
     } catch (error) {
       console.error('Error marking payment as paid:', error)
@@ -633,7 +576,6 @@ export const paymentApi = {
     
     try {
       const response = await api.put(`/payments/${paymentId}`, paymentData)
-      console.log('Payment marked as failed:', response.data)
       return response.data
     } catch (error) {
       console.error('Error marking payment as failed:', error)

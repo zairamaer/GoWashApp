@@ -412,8 +412,6 @@ const handleRegister = async () => {
     let errorMessage = 'Please check your information and try again.'
     
     if (error.response?.status === 422) {
-      // Handle 422 Unprocessable Entity - Laravel validation errors
-      console.log('Handling 422 validation error...')
       
       const serverErrors = error.response.data.errors || {}
       const serverMessage = error.response.data.message || 'Validation failed'

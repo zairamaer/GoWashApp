@@ -27,17 +27,35 @@
         
         <div class="form-group">
           <label for="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            v-model="form.password"
-            required
-            placeholder="Enter your password"
-            :disabled="loading"
-            :class="{ 'error': validationErrors.password }"
-            @blur="validatePassword"
-            @input="clearFieldError('password')"
-          />
+          <div class="password-input-container">
+            <input
+              :type="showPassword ? 'text' : 'password'"
+              id="password"
+              v-model="form.password"
+              required
+              placeholder="Enter your password"
+              :disabled="loading"
+              :class="{ 'error': validationErrors.password }"
+              @blur="validatePassword"
+              @input="clearFieldError('password')"
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              @click="togglePasswordVisibility"
+              :disabled="loading"
+              tabindex="-1"
+            >
+              <svg v-if="showPassword" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94l9.88 9.88ZM9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19l-9.84-9.95Z"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+              <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
           <span v-if="validationErrors.password" class="field-error">
             {{ validationErrors.password }}
           </span>
@@ -96,6 +114,7 @@ import { adminAuthService } from '../services/api'
 const router = useRouter()
 
 const loading = ref(false)
+const showPassword = ref(false)
 
 const form = reactive({
   email: '',
@@ -123,6 +142,11 @@ const isFormValid = computed(() => {
          !validationErrors.password &&
          validateEmailFormat(form.email)
 })
+
+// Password toggle function
+const togglePasswordVisibility = () => {
+  showPassword.value = !showPassword.value
+}
 
 // Validation functions
 const validateEmailFormat = (email) => {
@@ -328,6 +352,48 @@ const handleLogin = async () => {
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
 }
 
+.password-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-container input {
+  width: 100%;
+  padding-right: 3rem;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0.75rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.password-toggle:hover:not(:disabled) {
+  color: #374151;
+  background-color: #f3f4f6;
+}
+
+.password-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.password-toggle:focus {
+  outline: none;
+  color: #667eea;
+  background-color: rgba(102, 126, 234, 0.1);
+}
+
 .field-error {
   color: #ef4444;
   font-size: 0.75rem;
@@ -503,6 +569,10 @@ const handleLogin = async () => {
   
   .login-header h1 {
     font-size: 24px;
+  }
+  
+  .password-toggle {
+    right: 0.5rem;
   }
 }
 </style>

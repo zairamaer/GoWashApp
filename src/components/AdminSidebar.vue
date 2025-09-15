@@ -48,12 +48,14 @@
       </div>
     </div>
 
-    <div class="admin-sidebar" :class="{ collapsed: isCollapsed }">
+    <div class="admin-sidebar" :class="{ 
+      collapsed: isCollapsed, 
+      'mobile-open': props.isMobileOpen 
+    }">
       <!-- Sidebar Header -->
       <div class="sidebar-header">
         <div class="logo">
-          <div class="logo-icon">🚗</div>
-          <span v-if="!isCollapsed" class="logo-text">GoWash</span>
+          <span v-if="!isCollapsed || isMobile" class="logo-text">GoWash</span>
         </div>
         <button @click="toggleSidebar" class="collapse-btn" v-if="!isMobile">
           <svg v-if="!isCollapsed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -172,6 +174,14 @@ import { ref, computed, inject, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { adminAuthService } from '../services/api'
 
+// Define props
+const props = defineProps({
+  isMobileOpen: {
+    type: Boolean,
+    default: false
+  }
+})
+
 const router = useRouter()
 const isCollapsed = ref(false)
 const isMobile = ref(false)
@@ -250,11 +260,6 @@ const confirmLogout = async () => {
     console.error('Logout error:', error)
     showToastNotification('Logout failed. Please try again.', 'Error', 'error')
   }
-}
-
-const handleLogout = async () => {
-  // This is now replaced by showLogoutDialog
-  showLogoutDialog()
 }
 
 onMounted(() => {
@@ -497,18 +502,6 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.logo-icon {
-  font-size: 24px;
-  width: 40px;
-  height: 40px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
 }
 
 .logo-text {

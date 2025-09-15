@@ -233,7 +233,6 @@ const loadData = async () => {
     
     // Process auto-cancellations
     if (expiredAppointments.length > 0) {
-      console.log(`Auto-cancelling ${expiredAppointments.length} expired appointments`)
       
       for (const appointment of expiredAppointments) {
         try {

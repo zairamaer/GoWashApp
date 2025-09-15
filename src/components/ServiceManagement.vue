@@ -897,17 +897,11 @@ const deleteServiceRate = async (id) => {
 
 // Service Type methods
 const editServiceType = (type) => {
-  console.log('Editing service type:', type)
   editingServiceType.value = type
   serviceTypeForm.serviceTypeName = type.serviceTypeName
   serviceTypeForm.serviceTypeDescription = type.serviceTypeDescription
   serviceTypeForm.serviceTypeImage = type.serviceTypeImage
   
-  console.log('Form populated with:', {
-    serviceTypeName: serviceTypeForm.serviceTypeName,
-    serviceTypeDescription: serviceTypeForm.serviceTypeDescription,
-    serviceTypeImage: serviceTypeForm.serviceTypeImage
-  })
   
   // Reset file upload state when editing
   selectedFile.value = null
@@ -949,8 +943,6 @@ const saveServiceType = async () => {
 // New method to handle the actual save after confirmation
 const confirmSaveServiceType = async () => {
   try {
-    console.log('=== SAVE SERVICE TYPE DEBUG ===')
-    console.log('pendingSaveServiceTypeData:', pendingSaveServiceTypeData.value)
 
     // Prepare data object that matches your API service expectations
     const serviceTypeData = {
@@ -959,32 +951,19 @@ const confirmSaveServiceType = async () => {
       imageFile: pendingSaveServiceTypeData.value.imageFile
     }
 
-    console.log('Prepared serviceTypeData:', {
-      serviceTypeName: serviceTypeData.serviceTypeName,
-      serviceTypeDescription: serviceTypeData.serviceTypeDescription,
-      hasImageFile: !!serviceTypeData.imageFile,
-      imageFileName: serviceTypeData.imageFile?.name
-    })
 
     let result
     if (editingServiceType.value) {
-      console.log('Updating existing service type...', {
-        id: editingServiceType.value.serviceTypeID
-      })
       result = await serviceApi.updateServiceType(editingServiceType.value.serviceTypeID, serviceTypeData)
-      console.log('Update result:', result)
       showToast('success', 'Service type updated successfully!')
     } else {
-      console.log('Creating new service type...')
       result = await serviceApi.createServiceType(serviceTypeData)
-      console.log('Create result:', result)
       showToast('success', 'Service type created successfully!')
     }
 
     await loadData() // This will auto-sort the updated data
     closeModal()
     closeSaveServiceTypeConfirmation()
-    console.log('✅ Service type saved and data reloaded with sorting!')
   } catch (error) {
     console.error('❌ Error saving service type:', {
       message: error.message,
@@ -1028,10 +1007,8 @@ const deleteServiceType = async (id) => {
   
   if (confirm(confirmMessage)) {
     try {
-      console.log('Deleting service type:', { id, name: serviceTypeName, relatedRates: relatedRates.length })
       await serviceApi.deleteServiceType(id)
       await loadData() // This will auto-sort the updated data
-      console.log('Service type deleted successfully and data reloaded with sorting!')
       showToast('success', `"${serviceTypeName}" has been deleted successfully!`)
     } catch (error) {
       console.error('Error deleting service type:', error)
@@ -1078,8 +1055,6 @@ const saveVehicleSize = async () => {
 // Add this new method to handle the actual save after confirmation:
 const confirmSaveVehicleSize = async () => {
   try {
-    console.log('=== SAVE VEHICLE SIZE DEBUG ===')
-    console.log('pendingSaveVehicleSizeData:', pendingSaveVehicleSizeData.value)
 
     // Prepare data object
     const vehicleSizeData = {
@@ -1087,27 +1062,19 @@ const confirmSaveVehicleSize = async () => {
       vehicleSizeDescription: pendingSaveVehicleSizeData.value.vehicleSizeDescription
     }
 
-    console.log('Prepared vehicleSizeData:', vehicleSizeData)
 
     let result
     if (editingVehicleSize.value) {
-      console.log('Updating existing vehicle size...', {
-        code: editingVehicleSize.value.vehicleSizeCode
-      })
       result = await serviceApi.updateVehicleSize(editingVehicleSize.value.vehicleSizeCode, vehicleSizeData)
-      console.log('Update result:', result)
       showToast('success', 'Vehicle size updated successfully!')
     } else {
-      console.log('Creating new vehicle size...')
       result = await serviceApi.createVehicleSize(vehicleSizeData)
-      console.log('Create result:', result)
       showToast('success', 'Vehicle size created successfully!')
     }
 
     await loadData() // This will auto-sort the updated data
     closeModal()
     closeSaveVehicleSizeConfirmation()
-    console.log('✅ Vehicle size saved and data reloaded with sorting!')
   } catch (error) {
     console.error('❌ Error saving vehicle size:', {
       message: error.message,
@@ -1139,7 +1106,6 @@ const deleteVehicleSize = async (code) => {
       await serviceApi.deleteVehicleSize(code)
       showToast('success', 'Vehicle size deleted successfully!')
       await loadData() // This will auto-sort the updated data
-      console.log('✅ Vehicle size deleted and data reloaded with sorting!')
     } catch (error) {
       console.error('Error deleting vehicle size:', error)
       showToast('error', 'Failed to delete vehicle size: ' + (error.response?.data?.message || error.message))
@@ -1198,7 +1164,6 @@ const handleImageError = (event) => {
 }
 
 const handleImageLoad = (event) => {
-  console.log('Image loaded successfully:', event.target.src)
   event.target.style.border = '2px solid #38a169'
   event.target.style.backgroundColor = '#f0fff4'
   
@@ -1242,24 +1207,16 @@ const handleFileDrop = (event) => {
 }
 
 const processFile = (file) => {
-  console.log('=== FILE PROCESSING DEBUG ===')
-  console.log('Processing file:', {
-    name: file.name,
-    size: file.size,
-    type: file.type
-  })
   
   // Validate file type
   if (!file.type.startsWith('image/')) {
     uploadError.value = 'Please select a valid image file'
-    console.log('❌ Invalid file type:', file.type)
     return
   }
   
   // Validate file size (10MB limit)
   if (file.size > 10 * 1024 * 1024) {
     uploadError.value = 'File size must be less than 10MB'
-    console.log('❌ File too large:', file.size)
     return
   }
   
@@ -1267,17 +1224,11 @@ const processFile = (file) => {
   uploadError.value = ''
   selectedFile.value = file
   
-  console.log('✅ File selected successfully:', {
-    name: selectedFile.value.name,
-    size: selectedFile.value.size,
-    type: selectedFile.value.type
-  })
   
   // Create preview
   const reader = new FileReader()
   reader.onload = (e) => {
     imagePreview.value = e.target.result
-    console.log('✅ Image preview created')
   }
   reader.readAsDataURL(file)
 }
@@ -1289,29 +1240,6 @@ const removeImagePreview = () => {
   if (fileInput.value) {
     fileInput.value.value = ''
   }
-}
-
-// Debug methods
-const testImageUrls = () => {
-  console.log('=== Testing Image URLs ===')
-  serviceTypes.value.forEach(type => {
-    if (type.serviceTypeImage) {
-      console.log(`ID: ${type.serviceTypeID} | Service: ${type.serviceTypeName}`)
-      console.log(`Image URL: ${type.serviceTypeImage}`)
-      console.log('---')
-    }
-  })
-}
-
-// Manual sorting methods (optional - for testing or manual triggers)
-const manualSortServiceTypes = () => {
-  serviceTypes.value = sortServiceTypes(serviceTypes.value)
-  console.log('✅ Service types manually sorted!')
-}
-
-const manualSortVehicleSizes = () => {
-  vehicleSizes.value = sortVehicleSizes(vehicleSizes.value)
-  console.log('✅ Vehicle sizes manually sorted!')
 }
 
 // Lifecycle

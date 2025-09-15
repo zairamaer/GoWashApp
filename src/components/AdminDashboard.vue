@@ -148,6 +148,7 @@ const todayRevenue = computed(() => {
 
 const recentAppointments = computed(() => {
   return appointments.value
+    .filter(appointment => appointment.status === 'confirmed')
     .sort((a, b) => new Date(b.appointmentDateTime) - new Date(a.appointmentDateTime))
     .slice(0, 5)
 })

@@ -26,7 +26,7 @@
             @click="closeMobileMenu"
           >
             <span class="nav-icon">🏠</span>
-            Dashboard
+            Home
           </router-link>
           <router-link 
             to="/customer/book" 
