@@ -16,7 +16,13 @@
             required
             placeholder="Enter your email"
             :disabled="loading"
+            :class="{ 'error': validationErrors.email }"
+            @blur="validateEmail"
+            @input="clearFieldError('email')"
           />
+          <span v-if="validationErrors.email" class="field-error">
+            {{ validationErrors.email }}
+          </span>
         </div>
         
         <div class="form-group">
@@ -28,45 +34,168 @@
             required
             placeholder="Enter your password"
             :disabled="loading"
+            :class="{ 'error': validationErrors.password }"
+            @blur="validatePassword"
+            @input="clearFieldError('password')"
           />
+          <span v-if="validationErrors.password" class="field-error">
+            {{ validationErrors.password }}
+          </span>
         </div>
         
-        <button type="submit" class="login-btn" :disabled="loading">
-          <span v-if="loading">Signing in...</span>
+        <button type="submit" class="login-btn" :disabled="loading || !isFormValid">
+          <span v-if="loading">
+            <svg class="spinner" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="4" opacity="0.25"/>
+              <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" opacity="0.75"/>
+            </svg>
+            Signing in...
+          </span>
           <span v-else>Sign In</span>
         </button>
-        
-        <div v-if="error" class="error-message">
-          {{ error }}
-        </div>
       </form>
-      
-      <div class="test-links">
-        <router-link to="/test">Test API Connection</router-link>
-        <router-link to="/image-test">Test Images</router-link>
-      </div>
     </div>
+
+  <!-- Toast Notifications -->
+  <Transition name="toast" appear>
+    <div 
+      v-if="toast.show" 
+      :class="['toast', `toast-${toast.type}`]"
+    >
+      <div class="toast-icon">
+        <svg v-if="toast.type === 'success'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+          <polyline points="22,4 12,14.01 9,11.01"></polyline>
+        </svg>
+        <svg v-else-if="toast.type === 'error'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="15" y1="9" x2="9" y2="15"></line>
+          <line x1="9" y1="9" x2="15" y2="15"></line>
+        </svg>
+      </div>
+      <div class="toast-content">
+        <div class="toast-title">{{ toast.title }}</div>
+        <div class="toast-message">{{ toast.message }}</div>
+      </div>
+      <button @click="hideToast" class="toast-close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+  </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { adminAuthService } from '../services/api'
 
 const router = useRouter()
 
 const loading = ref(false)
-const error = ref('')
 
 const form = reactive({
   email: '',
   password: ''
 })
 
+const validationErrors = reactive({
+  email: '',
+  password: ''
+})
+
+const toast = reactive({
+  show: false,
+  type: 'success', // 'success' | 'error'
+  title: '',
+  message: '',
+  timeout: null
+})
+
+// Computed property to check if form is valid
+const isFormValid = computed(() => {
+  return form.email && 
+         form.password && 
+         !validationErrors.email && 
+         !validationErrors.password &&
+         validateEmailFormat(form.email)
+})
+
+// Validation functions
+const validateEmailFormat = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
+}
+
+const validateEmail = () => {
+  if (!form.email) {
+    validationErrors.email = 'Email is required'
+  } else if (!validateEmailFormat(form.email)) {
+    validationErrors.email = 'Please enter a valid email address'
+  } else {
+    validationErrors.email = ''
+  }
+}
+
+const validatePassword = () => {
+  if (!form.password) {
+    validationErrors.password = 'Password is required'
+  } else if (form.password.length < 6) {
+    validationErrors.password = 'Password must be at least 6 characters'
+  } else {
+    validationErrors.password = ''
+  }
+}
+
+const clearFieldError = (field) => {
+  if (validationErrors[field]) {
+    validationErrors[field] = ''
+  }
+}
+
+const validateForm = () => {
+  validateEmail()
+  validatePassword()
+  return !validationErrors.email && !validationErrors.password
+}
+
+// Toast functions
+const showToast = (type, title, message, duration = 5000) => {
+  // Clear any existing timeout
+  if (toast.timeout) {
+    clearTimeout(toast.timeout)
+  }
+
+  toast.type = type
+  toast.title = title
+  toast.message = message
+  toast.show = true
+
+  // Auto-hide toast after duration
+  toast.timeout = setTimeout(() => {
+    hideToast()
+  }, duration)
+}
+
+const hideToast = () => {
+  toast.show = false
+  if (toast.timeout) {
+    clearTimeout(toast.timeout)
+    toast.timeout = null
+  }
+}
+
 const handleLogin = async () => {
+  // Validate form before submission
+  if (!validateForm()) {
+    showToast('error', 'Validation Error', 'Please fix the errors below')
+    return
+  }
+
   loading.value = true
-  error.value = ''
   
   try {
     const response = await adminAuthService.login(form.email, form.password)
@@ -80,27 +209,41 @@ const handleLogin = async () => {
       if (admin) {
         localStorage.setItem('admin_user', JSON.stringify(admin))
       }
-      router.push('/admin/dashboard')
+      
+      showToast('success', 'Login Successful', 'Welcome back! Redirecting to dashboard...')
+      
+      // Redirect after a short delay to show the success message
+      setTimeout(() => {
+        router.push('/admin/dashboard')
+      }, 1500)
     } else {
-      error.value = 'Invalid response from server'
+      throw new Error('Invalid response from server')
     }
   } catch (err) {
     console.error('Login error:', err)
     
+    let errorTitle = 'Login Failed'
+    let errorMessage = 'Please try again'
+    
     // Handle different error response structures
     if (err.response?.data?.message) {
-      error.value = err.response.data.message
+      errorMessage = err.response.data.message
     } else if (err.response?.data?.error) {
-      error.value = err.response.data.error
+      errorMessage = err.response.data.error
     } else if (err.response?.status === 401) {
-      error.value = 'Invalid email or password'
+      errorTitle = 'Authentication Failed'
+      errorMessage = 'Invalid email or password'
     } else if (err.response?.status === 422) {
-      error.value = 'Please check your email and password format'
+      errorTitle = 'Validation Error'
+      errorMessage = 'Please check your email and password format'
     } else if (err.code === 'NETWORK_ERROR' || !err.response) {
-      error.value = 'Network error. Please check your connection.'
+      errorTitle = 'Connection Error'
+      errorMessage = 'Network error. Please check your connection.'
     } else {
-      error.value = 'Login failed. Please try again.'
+      errorMessage = err.message || 'An unexpected error occurred'
     }
+    
+    showToast('error', errorTitle, errorMessage)
   } finally {
     loading.value = false
   }
@@ -114,103 +257,102 @@ const handleLogin = async () => {
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
+  padding: 1rem;
 }
 
 .login-card {
   background: white;
-  border-radius: 16px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  padding: 2rem;
   width: 100%;
   max-width: 400px;
-  animation: slideUp 0.6s ease-out;
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .login-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 2rem;
 }
 
 .login-header h1 {
-  color: #2d3748;
-  font-size: 28px;
-  font-weight: 700;
-  margin: 0 0 8px 0;
+  font-size: 2rem;
+  font-weight: bold;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
 }
 
 .login-header p {
-  color: #718096;
-  font-size: 16px;
-  margin: 0;
+  color: #6b7280;
+  font-size: 0.875rem;
 }
 
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 1.5rem;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .form-group label {
-  color: #2d3748;
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  font-size: 0.875rem;
 }
 
 .form-group input {
-  padding: 12px 16px;
-  border: 2px solid #e2e8f0;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 1rem;
   transition: all 0.2s ease;
-  background: #f8fafc;
 }
 
 .form-group input:focus {
   outline: none;
   border-color: #667eea;
-  background: white;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .form-group input:disabled {
+  background-color: #f9fafb;
   opacity: 0.6;
-  cursor: not-allowed;
+}
+
+.form-group input.error {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.field-error {
+  color: #ef4444;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
 }
 
 .login-btn {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  padding: 14px 24px;
+  padding: 0.75rem 1.5rem;
   border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
 .login-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
 .login-btn:disabled {
@@ -219,40 +361,141 @@ const handleLogin = async () => {
   transform: none;
 }
 
-.error-message {
-  background: #fed7d7;
-  color: #c53030;
-  padding: 12px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  text-align: center;
-  border: 1px solid #feb2b2;
+.spinner {
+  width: 16px;
+  height: 16px;
+  animation: spin 1s linear infinite;
 }
 
-.test-links {
-  text-align: center;
-  margin-top: 20px;
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Toast Styles */
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2000;
+  min-width: 320px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
   display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 20px;
+  color: white;
+}
+
+.toast-success {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.95) 0%, rgba(21, 128, 61, 0.95) 100%);
+}
+
+.toast-error {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(185, 28, 28, 0.95) 100%);
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 16px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
 }
 
-.test-links a {
-  color: #667eea;
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 500;
-  padding: 8px 12px;
+.toast-content {
+  flex: 1;
+}
+
+.toast-title {
+  margin: 0 0 4px 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: white;
+}
+
+.toast-message {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.9;
+  color: white;
+  line-height: 1.4;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 4px;
   border-radius: 4px;
-  transition: all 0.2s;
+  transition: background-color 0.2s ease;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.test-links a:hover {
-  background: rgba(102, 126, 234, 0.1);
-  text-decoration: none;
+.toast-close:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
+/* Toast Transitions */
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.3s ease;
+}
+
+.toast-enter-from {
+  opacity: 0;
+  transform: translateX(100%);
+}
+
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(100%);
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .toast {
+    top: 15px;
+    right: 15px;
+    left: 15px;
+    max-width: none;
+    min-width: auto;
+  }
+  
+  .toast-content {
+    padding: 14px 20px;
+  }
+  
+  .toast-title {
+    font-size: 0.8rem;
+  }
+  
+  .toast-message {
+    font-size: 0.75rem;
+  }
+}
+
+/* Responsive Design */
 @media (max-width: 480px) {
+  .toast {
+    top: 20px;
+    right: 20px;
+    left: 20px;
+    max-width: none;
+    min-width: auto;
+  }
+  
   .login-card {
     padding: 30px 20px;
     margin: 10px;

@@ -3,26 +3,29 @@
     <!-- Page Header -->
     <div class="page-header">
       <h1>Appointments Management</h1>
-      <p>View and manage customer appointments and bookings.</p>
+      <p>View and manage completed and cancelled customer appointments.</p>
     </div>
 
     <!-- Filters and Search -->
     <div class="filters-section">
       <div class="filters-row">
         <div class="filter-group">
-          <label>Status Filter:</label>
+          <label>Status:</label>
           <select v-model="statusFilter" @change="filterAppointments">
-            <option value="">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
+            <option value="all">All (Completed & Cancelled)</option>
+            <option value="completed">Completed Only</option>
+            <option value="cancelled">Cancelled Only</option>
           </select>
         </div>
         
         <div class="filter-group">
-          <label>Date Range:</label>
-          <input type="date" v-model="dateFilter" @change="filterAppointments" />
+          <label>Time Period:</label>
+          <select v-model="timePeriod" @change="filterAppointments">
+            <option value="all">All</option>
+            <option value="today">Today</option>
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+          </select>
         </div>
         
         <div class="filter-group">
@@ -33,6 +36,28 @@
             @input="filterAppointments"
             placeholder="Search by customer name or service..."
           />
+        </div>
+        
+        <div class="filter-group">
+          <label>Sort by:</label>
+          <select v-model="sortBy" @change="sortAppointments">
+            <option value="date">Date (Nearest First)</option>
+            <option value="dateDesc">Date (Latest First)</option>
+            <option value="customer">Customer Name</option>
+            <option value="service">Service Type</option>
+            <option value="price">Price (Low to High)</option>
+            <option value="priceDesc">Price (High to Low)</option>
+          </select>
+        </div>
+        
+        <div class="filter-group">
+          <label>Filter by Month:</label>
+          <select v-model="monthFilter" @change="filterAppointments">
+            <option value="">All Months</option>
+            <option v-for="(month, index) in monthOptions" :key="index" :value="month.value">
+              {{ month.label }}
+            </option>
+          </select>
         </div>
       </div>
     </div>
@@ -49,7 +74,6 @@
             <th>Status</th>
             <th>Price</th>
             <th>Notes</th>
-            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -79,16 +103,9 @@
               </div>
             </td>
             <td>
-              <select 
-                :value="appointment.status" 
-                @change="updateAppointmentStatus(appointment.appointmentID, $event.target.value)"
-                :class="['status-select', appointment.status]"
-              >
-                <option value="pending">Pending</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+              <span :class="['status-badge', appointment.status]">
+                {{ appointment.status }}
+              </span>
             </td>
             <td class="price-cell">₱{{ parseFloat(appointment.service_rate?.price || 0).toFixed(2) }}</td>
             <td>
@@ -97,22 +114,6 @@
                   {{ appointment.notes.length > 30 ? appointment.notes.substring(0, 30) + '...' : appointment.notes }}
                 </span>
                 <span v-else class="no-notes">No notes</span>
-              </div>
-            </td>
-            <td>
-              <div class="action-buttons">
-                <button @click="editAppointment(appointment)" class="edit-btn" title="Edit">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                  </svg>
-                </button>
-                <button @click="deleteAppointment(appointment.appointmentID)" class="delete-btn" title="Delete">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3,6 5,6 21,6"/>
-                    <path d="M19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"/>
-                  </svg>
-                </button>
               </div>
             </td>
           </tr>
@@ -149,12 +150,9 @@
           
           <div class="form-group">
             <label>Status</label>
-            <select v-model="appointmentForm.status" required>
-              <option value="pending">Pending</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+            <span :class="['status-badge', appointmentForm.status]">
+              {{ appointmentForm.status }}
+            </span>
           </div>
           
           <div class="form-group">
@@ -185,7 +183,7 @@
         <line x1="3" y1="10" x2="21" y2="10"/>
       </svg>
       <h3>No appointments found</h3>
-      <p>Try adjusting your filters or check back later.</p>
+      <p>No appointments match your current filters.</p>
     </div>
   </div>
 </template>
@@ -201,9 +199,11 @@ const vehicleSizes = ref([])
 const loading = ref(false)
 
 // Filters
-const statusFilter = ref('')
-const dateFilter = ref('')
+const statusFilter = ref('all') // New status filter
+const timePeriod = ref('all')
 const searchQuery = ref('')
+const sortBy = ref('date')
+const monthFilter = ref('')
 
 // Modal state
 const showEditModal = ref(false)
@@ -217,19 +217,90 @@ const appointmentForm = reactive({
 })
 
 // Computed
+const monthOptions = computed(() => {
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ]
+  
+  const currentYear = new Date().getFullYear()
+  const currentMonth = new Date().getMonth()
+  const options = []
+  
+  // Add current year months
+  for (let i = 0; i < 12; i++) {
+    const monthIndex = (currentMonth - i + 12) % 12
+    const year = currentMonth - i < 0 ? currentYear - 1 : currentYear
+    options.push({
+      value: `${year}-${monthIndex}`,
+      label: `${months[monthIndex]} ${year}`
+    })
+  }
+  
+  // Add "This Year" option
+  options.push({
+    value: `year-${currentYear}`,
+    label: `This Year (${currentYear})`
+  })
+  
+  return options
+})
+
 const filteredAppointments = computed(() => {
   let filtered = appointments.value
 
-  // Filter by status
-  if (statusFilter.value) {
+  // Filter by status (completed and/or cancelled)
+  if (statusFilter.value !== 'all') {
     filtered = filtered.filter(apt => apt.status === statusFilter.value)
+  } else {
+    // Show only completed and cancelled appointments when "all" is selected
+    filtered = filtered.filter(apt => apt.status === 'completed' || apt.status === 'cancelled')
   }
 
-  // Filter by date
-  if (dateFilter.value) {
+  // Filter by time period
+  if (timePeriod.value !== 'all') {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    
     filtered = filtered.filter(apt => {
-      const aptDate = new Date(apt.appointmentDateTime).toISOString().split('T')[0]
-      return aptDate === dateFilter.value
+      const aptDate = new Date(apt.appointmentDateTime)
+      const aptDateOnly = new Date(aptDate.getFullYear(), aptDate.getMonth(), aptDate.getDate())
+      
+      switch (timePeriod.value) {
+        case 'today':
+          return aptDateOnly.getTime() === today.getTime()
+        case 'week':
+          const weekStart = new Date(today)
+          weekStart.setDate(today.getDate() - today.getDay()) // Start of week (Sunday)
+          const weekEnd = new Date(weekStart)
+          weekEnd.setDate(weekStart.getDate() + 6) // End of week (Saturday)
+          return aptDateOnly >= weekStart && aptDateOnly <= weekEnd
+        case 'month':
+          return aptDate.getMonth() === now.getMonth() && aptDate.getFullYear() === now.getFullYear()
+        default:
+          return true
+      }
+    })
+  }
+
+  // Filter by month
+  if (monthFilter.value) {
+    filtered = filtered.filter(apt => {
+      const aptDate = new Date(apt.appointmentDateTime)
+      
+      // Handle year filter (e.g., "year-2024")
+      if (monthFilter.value.startsWith('year-')) {
+        const year = parseInt(monthFilter.value.split('-')[1])
+        return aptDate.getFullYear() === year
+      }
+      
+      // Handle specific month filter (e.g., "2024-0" for January 2024)
+      if (monthFilter.value.includes('-')) {
+        const [year, month] = monthFilter.value.split('-').map(Number)
+        return aptDate.getFullYear() === year && aptDate.getMonth() === month
+      }
+      
+      return true
     })
   }
 
@@ -242,6 +313,26 @@ const filteredAppointments = computed(() => {
       return customerName.includes(query) || serviceName.includes(query)
     })
   }
+
+  // Sort appointments
+  filtered.sort((a, b) => {
+    switch (sortBy.value) {
+      case 'date':
+        return new Date(a.appointmentDateTime) - new Date(b.appointmentDateTime)
+      case 'dateDesc':
+        return new Date(b.appointmentDateTime) - new Date(a.appointmentDateTime)
+      case 'customer':
+        return (a.customer?.name || '').localeCompare(b.customer?.name || '')
+      case 'service':
+        return getServiceName(a.service_rate?.serviceTypeID).localeCompare(getServiceName(b.service_rate?.serviceTypeID))
+      case 'price':
+        return parseFloat(a.service_rate?.price || 0) - parseFloat(b.service_rate?.price || 0)
+      case 'priceDesc':
+        return parseFloat(b.service_rate?.price || 0) - parseFloat(a.service_rate?.price || 0)
+      default:
+        return 0
+    }
+  })
 
   return filtered
 })
@@ -270,6 +361,10 @@ const filterAppointments = () => {
   // This is handled by the computed property
 }
 
+const sortAppointments = () => {
+  // This is handled by the computed property
+}
+
 const getServiceName = (serviceTypeID) => {
   const serviceType = serviceTypes.value.find(type => type.serviceTypeID === serviceTypeID)
   return serviceType?.serviceTypeName || 'Unknown Service'
@@ -283,28 +378,6 @@ const getServiceDescription = (serviceTypeID) => {
 const getVehicleSizeDescription = (vehicleSizeCode) => {
   const vehicleSize = vehicleSizes.value.find(size => size.vehicleSizeCode === vehicleSizeCode)
   return vehicleSize?.vehicleSizeDescription || vehicleSizeCode || 'Unknown'
-}
-
-const updateAppointmentStatus = async (appointmentID, newStatus) => {
-  try {
-    await appointmentApi.updateAppointment(appointmentID, { status: newStatus })
-    // Update local state
-    const appointment = appointments.value.find(apt => apt.appointmentID === appointmentID)
-    if (appointment) {
-      appointment.status = newStatus
-    }
-  } catch (error) {
-    console.error('Error updating appointment status:', error)
-    alert('Failed to update appointment status')
-  }
-}
-
-const editAppointment = (appointment) => {
-  editingAppointment.value = appointment
-  appointmentForm.appointmentDateTime = formatDateTimeForInput(appointment.appointmentDateTime)
-  appointmentForm.status = appointment.status
-  appointmentForm.notes = appointment.notes || ''
-  showEditModal.value = true
 }
 
 const saveAppointment = async () => {
@@ -323,18 +396,6 @@ const saveAppointment = async () => {
   } catch (error) {
     console.error('Error saving appointment:', error)
     alert('Failed to save appointment changes')
-  }
-}
-
-const deleteAppointment = async (id) => {
-  if (confirm('Are you sure you want to delete this appointment?')) {
-    try {
-      await appointmentApi.deleteAppointment(id)
-      appointments.value = appointments.value.filter(apt => apt.appointmentID !== id)
-    } catch (error) {
-      console.error('Error deleting appointment:', error)
-      alert('Failed to delete appointment')
-    }
   }
 }
 
@@ -372,37 +433,66 @@ onMounted(() => {
 
 <style scoped>
 .appointments-management {
-  background: #f8fafc;
   min-height: calc(100vh - 64px);
+  padding: 24px;
 }
 
 .page-header {
   margin-bottom: 32px;
+  text-align: center;
+  padding: 48px 32px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.page-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
 }
 
 .page-header h1 {
-  color: #2d3748;
-  font-size: 28px;
-  font-weight: 700;
-  margin: 0 0 8px 0;
+  color: #1a202c;
+  font-size: 42px;
+  font-weight: 900;
+  margin: 0 0 16px 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
 }
 
 .page-header p {
-  color: #718096;
-  font-size: 16px;
+  color: #64748b;
+  font-size: 20px;
   margin: 0;
+  font-weight: 400;
+  opacity: 0.9;
 }
 
 .filters-section {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  padding: 24px;
-  margin-bottom: 24px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  padding: 32px;
+  margin-bottom: 32px;
 }
 
 .filters-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 24px;
   align-items: end;
 }
@@ -410,36 +500,47 @@ onMounted(() => {
 .filter-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-width: 200px;
+  gap: 10px;
 }
 
 .filter-group label {
-  color: #4a5568;
-  font-weight: 500;
+  color: #1a202c;
+  font-weight: 600;
   font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .filter-group input,
 .filter-group select {
-  padding: 10px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 14px;
-  transition: border-color 0.2s;
+  padding: 14px 18px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  background: white;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .filter-group input:focus,
 .filter-group select:focus {
   outline: none;
   border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+  transform: translateY(-1px);
+}
+
+.filter-group input::placeholder {
+  color: #a0aec0;
+  font-weight: 400;
 }
 
 .table-container {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   overflow-x: auto;
 }
@@ -451,118 +552,130 @@ onMounted(() => {
 }
 
 .data-table th {
-  background: #f7fafc;
-  color: #4a5568;
-  font-weight: 600;
-  padding: 12px 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%);
+  color: #2d3748;
+  font-weight: 700;
+  padding: 18px 20px;
   text-align: left;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 2px solid #e2e8f0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .data-table td {
-  padding: 12px 16px;
-  border-bottom: 1px solid #f1f5f9;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.5);
   color: #2d3748;
+  font-weight: 500;
+}
+
+.data-table tr {
+  transition: all 0.2s ease;
 }
 
 .data-table tr:hover {
-  background: #f8fafc;
+  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+  transform: scale(1.001);
 }
 
 .customer-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .customer-name {
-  font-weight: 600;
-  color: #2d3748;
+  font-weight: 700;
+  color: #1a202c;
+  font-size: 15px;
 }
 
 .customer-contact {
-  font-size: 12px;
+  font-size: 13px;
   color: #718096;
+  font-weight: 500;
 }
 
 .service-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .service-name {
-  font-weight: 600;
-  color: #2d3748;
+  font-weight: 700;
+  color: #1a202c;
+  font-size: 15px;
 }
 
 .service-description {
-  font-size: 12px;
+  font-size: 13px;
   color: #718096;
+  font-weight: 500;
 }
 
 .vehicle-size {
-  background: #e6fffa;
-  color: #319795;
-  padding: 4px 8px;
-  border-radius: 12px;
+  background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(66, 153, 225, 0.3);
 }
 
 .datetime-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .date {
-  font-weight: 600;
-  color: #2d3748;
+  font-weight: 700;
+  color: #1a202c;
+  font-size: 15px;
 }
 
 .time {
-  font-size: 12px;
+  font-size: 13px;
   color: #718096;
-}
-
-.status-select {
-  padding: 6px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 12px;
   font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
 }
 
-.status-select.pending {
-  background: #fef5e7;
-  color: #d69e2e;
-  border-color: #f6e05e;
+.status-badge {
+  padding: 10px 18px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-block;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.status-select.confirmed {
-  background: #f0fff4;
-  color: #38a169;
-  border-color: #68d391;
+.status-badge.cancelled {
+  background-color: #fee;
+  color: #c53030;
+  border: 1px solid #fed7d7;
 }
 
-.status-select.completed {
-  background: #e6fffa;
-  color: #319795;
-  border-color: #4fd1c7;
+.status-badge.confirmed {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
 }
 
-.status-select.cancelled {
-  background: #fed7d7;
-  color: #e53e3e;
-  border-color: #fc8181;
+.status-badge.completed {
+  background: linear-gradient(135deg, #4fd1c7 0%, #319795 100%);
+  color: white;
 }
 
 .price-cell {
-  font-weight: 600;
+  font-weight: 700;
   color: #38a169;
+  font-size: 16px;
 }
 
 .notes-cell {
@@ -571,48 +684,18 @@ onMounted(() => {
 
 .has-notes {
   color: #4a5568;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .no-notes {
-  color: #a0aec0;
+  color: #cbd5e0;
   font-style: italic;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.action-buttons {
-  display: flex;
-  gap: 8px;
-}
 
-.edit-btn, .delete-btn {
-  border: none;
-  padding: 6px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.edit-btn {
-  background: #4299e1;
-  color: white;
-}
-
-.edit-btn:hover {
-  background: #3182ce;
-}
-
-.delete-btn {
-  background: #e53e3e;
-  color: white;
-}
-
-.delete-btn:hover {
-  background: #c53030;
-}
 
 .modal-overlay {
   position: fixed;
@@ -620,7 +703,8 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -629,44 +713,57 @@ onMounted(() => {
 
 .modal {
   background: white;
-  border-radius: 8px;
+  border-radius: 24px;
   width: 90%;
-  max-width: 500px;
+  max-width: 550px;
   max-height: 90vh;
   overflow-y: auto;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid #e2e8f0;
+  padding: 28px 32px;
+  border-bottom: 2px solid #f1f5f9;
+  background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%);
+  border-radius: 24px 24px 0 0;
 }
 
 .modal-header h3 {
-  color: #2d3748;
-  font-size: 18px;
-  font-weight: 600;
+  color: #1a202c;
+  font-size: 24px;
+  font-weight: 800;
   margin: 0;
+  letter-spacing: -0.5px;
 }
 
 .close-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
+  background: #f7fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 20px;
   color: #718096;
   cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
+  padding: 8px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #edf2f7;
+  color: #4a5568;
+  transform: scale(1.05);
 }
 
 .modal-form {
-  padding: 24px;
+  padding: 32px;
 }
 
 .form-group {
@@ -681,7 +778,6 @@ onMounted(() => {
 }
 
 .form-group input,
-.form-group select,
 .form-group textarea {
   width: 100%;
   padding: 10px 12px;
@@ -692,7 +788,6 @@ onMounted(() => {
 }
 
 .form-group input:focus,
-.form-group select:focus,
 .form-group textarea:focus {
   outline: none;
   border-color: #667eea;
@@ -707,36 +802,46 @@ onMounted(() => {
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
+  gap: 16px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 2px solid #f1f5f9;
 }
 
 .cancel-btn, .save-btn {
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-weight: 500;
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .cancel-btn {
   background: #f7fafc;
   color: #4a5568;
-  border: 1px solid #e2e8f0;
+  border: 2px solid #e2e8f0;
 }
 
 .cancel-btn:hover {
   background: #edf2f7;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .save-btn {
-  background: #667eea;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
 .save-btn:hover {
-  background: #5a67d8;
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
 
 .loading-state {
@@ -744,20 +849,22 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 80px 20px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
 .loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e2e8f0;
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(102, 126, 234, 0.2);
   border-top: 4px solid #667eea;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 @keyframes spin {
@@ -765,50 +872,762 @@ onMounted(() => {
   100% { transform: rotate(360deg); }
 }
 
+.loading-state p {
+  color: #4a5568;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 80px 20px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   color: #718096;
 }
 
 .empty-state svg {
-  margin-bottom: 16px;
-  opacity: 0.5;
+  margin-bottom: 20px;
+  opacity: 0.6;
+  stroke: #cbd5e0;
 }
 
 .empty-state h3 {
-  color: #4a5568;
-  margin: 0 0 8px 0;
+  color: #2d3748;
+  margin: 0 0 12px 0;
+  font-size: 20px;
+  font-weight: 700;
 }
 
 .empty-state p {
   margin: 0;
   text-align: center;
+  font-size: 16px;
+  font-weight: 500;
 }
 
-@media (max-width: 768px) {
-  .filters-row {
-    flex-direction: column;
-    gap: 16px;
+/* Progressive Responsive Design - Mobile First Approach with Fluid Scaling */
+
+/* Base styles (Mobile First - 320px+) */
+.appointments-management {
+  padding: clamp(8px, 3vw, 12px);
+  min-height: calc(100vh - 64px);
+}
+
+.page-header {
+  padding: clamp(16px, 4vw, 24px) clamp(12px, 3vw, 16px);
+  margin-bottom: clamp(12px, 3vw, 20px);
+  border-radius: clamp(12px, 2vw, 16px);
+}
+
+.page-header h1 {
+  font-size: clamp(20px, 6vw, 28px);
+  line-height: 1.2;
+  margin-bottom: clamp(6px, 2vw, 12px);
+}
+
+.page-header p {
+  font-size: clamp(13px, 4vw, 16px);
+}
+
+.filters-section {
+  padding: clamp(14px, 4vw, 20px);
+  border-radius: clamp(12px, 2vw, 16px);
+  margin-bottom: clamp(12px, 3vw, 20px);
+}
+
+.filters-row {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 3vw, 16px);
+}
+
+.filter-group label {
+  font-size: clamp(12px, 3vw, 14px);
+}
+
+.filter-group input,
+.filter-group select {
+  padding: clamp(10px, 3vw, 12px) clamp(12px, 3vw, 14px);
+  font-size: clamp(13px, 4vw, 15px);
+  border-radius: clamp(8px, 2vw, 12px);
+}
+
+.table-container {
+  border-radius: clamp(12px, 2vw, 16px);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 clamp(-12px, -3vw, 0px);
+}
+
+.data-table {
+  min-width: 600px;
+  font-size: clamp(12px, 3vw, 14px);
+}
+
+.data-table th,
+.data-table td {
+  padding: clamp(8px, 2vw, 12px) clamp(10px, 2vw, 14px);
+}
+
+.customer-name,
+.service-name,
+.date {
+  font-size: clamp(12px, 3vw, 14px);
+}
+
+.customer-contact,
+.service-description,
+.time {
+  font-size: clamp(11px, 3vw, 13px);
+}
+
+.status-badge,
+.vehicle-size {
+  padding: clamp(4px, 1vw, 6px) clamp(8px, 2vw, 12px);
+  font-size: clamp(9px, 2vw, 11px);
+}
+
+.price-cell {
+  font-size: clamp(13px, 4vw, 16px);
+}
+
+.modal {
+  margin: clamp(8px, 2vw, 16px);
+  width: calc(100% - clamp(16px, 4vw, 32px));
+  border-radius: clamp(12px, 2vw, 16px);
+  max-height: calc(100vh - clamp(16px, 4vw, 32px));
+}
+
+.modal-header,
+.modal-form {
+  padding: clamp(16px, 4vw, 24px);
+}
+
+.modal-header h3 {
+  font-size: clamp(18px, 5vw, 24px);
+}
+
+.modal-actions {
+  flex-direction: column;
+  gap: clamp(8px, 2vw, 12px);
+}
+
+/* Small Mobile Enhanced - 375px+ */
+@media (min-width: 375px) {
+  .appointments-management {
+    padding: clamp(12px, 3vw, 16px);
   }
   
-  .filter-group {
-    min-width: auto;
+  .page-header {
+    padding: clamp(20px, 5vw, 28px) clamp(16px, 4vw, 20px);
+    margin-bottom: clamp(16px, 4vw, 24px);
+    border-radius: clamp(14px, 2vw, 18px);
+  }
+  
+  .page-header h1 {
+    font-size: clamp(24px, 6vw, 32px);
+    margin-bottom: clamp(8px, 2vw, 14px);
+  }
+  
+  .page-header p {
+    font-size: clamp(14px, 4vw, 18px);
+  }
+  
+  .filters-section {
+    padding: clamp(16px, 4vw, 24px);
+    border-radius: clamp(14px, 2vw, 18px);
+    margin-bottom: clamp(16px, 4vw, 24px);
+  }
+  
+  .filters-row {
+    gap: clamp(12px, 3vw, 18px);
   }
   
   .data-table {
-    font-size: 14px;
+    min-width: 650px;
+    font-size: clamp(13px, 3vw, 15px);
   }
   
   .data-table th,
   .data-table td {
-    padding: 8px 12px;
+    padding: clamp(10px, 2vw, 14px) clamp(12px, 3vw, 16px);
+  }
+  
+  .customer-name,
+  .service-name,
+  .date {
+    font-size: clamp(13px, 3vw, 15px);
+  }
+  
+  .customer-contact,
+  .service-description,
+  .time {
+    font-size: clamp(12px, 3vw, 14px);
+  }
+  
+  .status-badge,
+  .vehicle-size {
+    padding: clamp(5px, 1vw, 7px) clamp(10px, 2vw, 14px);
+    font-size: clamp(10px, 2vw, 12px);
+  }
+}
+
+/* Large Mobile / Small Tablet - 480px+ */
+@media (min-width: 480px) {
+  .filters-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: clamp(14px, 3vw, 20px);
+  }
+  
+  .data-table {
+    min-width: 750px;
+  }
+  
+  .modal-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: clamp(10px, 2vw, 16px);
+  }
+  
+  .cancel-btn,
+  .save-btn {
+    flex: 0 0 auto;
+    min-width: 120px;
+  }
+}
+
+/* Portrait Tablet - 600px+ */
+@media (min-width: 600px) {
+  .appointments-management {
+    padding: clamp(16px, 3vw, 24px);
+  }
+  
+  .page-header {
+    padding: clamp(32px, 6vw, 40px) clamp(24px, 4vw, 32px);
+    margin-bottom: clamp(24px, 4vw, 32px);
+    border-radius: clamp(16px, 2vw, 20px);
+  }
+  
+  .page-header h1 {
+    font-size: clamp(28px, 6vw, 36px);
+    margin-bottom: clamp(12px, 2vw, 16px);
+  }
+  
+  .page-header p {
+    font-size: clamp(16px, 3vw, 20px);
+  }
+  
+  .filters-section {
+    padding: clamp(20px, 4vw, 28px);
+    border-radius: clamp(16px, 2vw, 20px);
+    margin-bottom: clamp(20px, 4vw, 28px);
+  }
+  
+  .filters-row {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: clamp(16px, 3vw, 24px);
+  }
+  
+  .table-container {
+    border-radius: clamp(16px, 2vw, 20px);
+    margin: 0;
+  }
+  
+  .data-table {
+    min-width: 900px;
+    font-size: clamp(14px, 2vw, 16px);
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: clamp(14px, 2vw, 18px) clamp(16px, 3vw, 20px);
+  }
+  
+  .modal {
+    max-width: clamp(400px, 60vw, 520px);
+    margin: clamp(20px, 4vw, 32px) auto;
+    width: 90%;
+  }
+}
+
+/* Standard Tablet - 768px+ */
+@media (min-width: 768px) {
+  .appointments-management {
+    padding: clamp(20px, 3vw, 28px);
+  }
+  
+  .page-header {
+    padding: clamp(36px, 6vw, 48px) clamp(28px, 4vw, 36px);
+    margin-bottom: clamp(28px, 4vw, 36px);
+    border-radius: clamp(18px, 2vw, 22px);
+  }
+  
+  .page-header h1 {
+    font-size: clamp(32px, 5vw, 42px);
+  }
+  
+  .page-header p {
+    font-size: clamp(17px, 3vw, 22px);
+  }
+  
+  .filters-section {
+    padding: clamp(24px, 4vw, 32px);
+    border-radius: clamp(18px, 2vw, 22px);
+    margin-bottom: clamp(24px, 4vw, 32px);
+  }
+  
+  .filters-row {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: clamp(18px, 3vw, 26px);
+  }
+  
+  .data-table {
+    min-width: 1000px;
+    font-size: clamp(14px, 2vw, 16px);
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: clamp(15px, 2vw, 20px) clamp(18px, 3vw, 24px);
+  }
+  
+  .status-badge {
+    padding: clamp(7px, 1vw, 10px) clamp(14px, 2vw, 18px);
+    font-size: clamp(11px, 2vw, 13px);
+  }
+  
+  .vehicle-size {
+    padding: clamp(6px, 1vw, 9px) clamp(13px, 2vw, 17px);
+    font-size: clamp(11px, 2vw, 13px);
+  }
+  
+  .modal {
+    max-width: clamp(480px, 65vw, 580px);
+  }
+}
+
+/* Large Tablet / Small Desktop - 1024px+ */
+@media (min-width: 1024px) {
+  .appointments-management {
+    padding: clamp(24px, 3vw, 32px);
+  }
+  
+  .page-header {
+    padding: clamp(42px, 6vw, 56px) clamp(32px, 4vw, 44px);
+    margin-bottom: clamp(32px, 4vw, 44px);
+    border-radius: clamp(20px, 2vw, 24px);
+  }
+  
+  .page-header h1 {
+    font-size: clamp(36px, 4vw, 48px);
+    margin-bottom: clamp(14px, 2vw, 18px);
+  }
+  
+  .page-header p {
+    font-size: clamp(18px, 2vw, 24px);
+  }
+  
+  .filters-section {
+    padding: clamp(28px, 4vw, 36px);
+    border-radius: clamp(20px, 2vw, 24px);
+    margin-bottom: clamp(28px, 4vw, 36px);
+  }
+  
+  .filters-row {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: clamp(20px, 3vw, 28px);
+  }
+  
+  .filter-group input,
+  .filter-group select {
+    padding: clamp(13px, 2vw, 16px) clamp(16px, 2vw, 20px);
+    font-size: clamp(14px, 1vw, 16px);
+  }
+  
+  .table-container {
+    border-radius: clamp(20px, 2vw, 24px);
+  }
+  
+  .data-table {
+    min-width: 1200px;
+    font-size: clamp(14px, 1vw, 16px);
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: clamp(16px, 2vw, 22px) clamp(20px, 2vw, 26px);
+  }
+  
+  .customer-name,
+  .service-name,
+  .date {
+    font-size: clamp(14px, 1vw, 16px);
+  }
+  
+  .customer-contact,
+  .service-description,
+  .time {
+    font-size: clamp(13px, 1vw, 15px);
+  }
+  
+  .status-badge {
+    padding: clamp(8px, 1vw, 12px) clamp(16px, 2vw, 20px);
+    font-size: clamp(11px, 1vw, 13px);
+  }
+  
+  .vehicle-size {
+    padding: clamp(7px, 1vw, 10px) clamp(14px, 2vw, 18px);
+    font-size: clamp(11px, 1vw, 13px);
+  }
+  
+  .modal {
+    max-width: clamp(520px, 60vw, 680px);
+  }
+  
+  .modal-header,
+  .modal-form {
+    padding: clamp(24px, 3vw, 36px);
+  }
+  
+  .modal-header h3 {
+    font-size: clamp(20px, 2vw, 28px);
+  }
+}
+
+/* Standard Desktop - 1200px+ */
+@media (min-width: 1200px) {
+  .appointments-management {
+    padding: clamp(28px, 3vw, 40px) clamp(32px, 4vw, 48px);
+  }
+  
+  .page-header {
+    padding: clamp(48px, 5vw, 64px) clamp(36px, 4vw, 48px);
+    margin-bottom: clamp(36px, 4vw, 48px);
+    border-radius: clamp(22px, 2vw, 28px);
+  }
+  
+  .page-header h1 {
+    font-size: clamp(40px, 3vw, 52px);
+    margin-bottom: clamp(16px, 2vw, 20px);
+  }
+  
+  .page-header p {
+    font-size: clamp(19px, 2vw, 26px);
+  }
+  
+  .filters-section {
+    padding: clamp(32px, 3vw, 44px);
+    border-radius: clamp(22px, 2vw, 28px);
+    margin-bottom: clamp(32px, 4vw, 44px);
+  }
+  
+  .filters-row {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: clamp(24px, 3vw, 32px);
+  }
+  
+  .data-table {
+    min-width: 1300px;
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: clamp(18px, 2vw, 24px) clamp(22px, 2vw, 28px);
+  }
+  
+  .status-badge {
+    padding: clamp(9px, 1vw, 13px) clamp(17px, 2vw, 22px);
+    font-size: clamp(12px, 1vw, 14px);
+  }
+  
+  .vehicle-size {
+    padding: clamp(8px, 1vw, 11px) clamp(15px, 2vw, 20px);
+    font-size: clamp(12px, 1vw, 14px);
+  }
+  
+  .modal {
+    max-width: clamp(580px, 55vw, 720px);
+  }
+}
+
+/* Large Desktop - 1440px+ */
+@media (min-width: 1440px) {
+  .appointments-management {
+    padding: clamp(32px, 3vw, 48px) clamp(40px, 4vw, 64px);
+  }
+  
+  .page-header {
+    padding: clamp(56px, 5vw, 72px) clamp(44px, 4vw, 56px);
+    margin-bottom: clamp(40px, 4vw, 56px);
+    border-radius: clamp(24px, 2vw, 32px);
+  }
+  
+  .page-header h1 {
+    font-size: clamp(44px, 3vw, 60px);
+  }
+  
+  .page-header p {
+    font-size: clamp(21px, 2vw, 30px);
+  }
+  
+  .filters-section {
+    padding: clamp(36px, 3vw, 48px);
+    border-radius: clamp(24px, 2vw, 32px);
+    margin-bottom: clamp(36px, 4vw, 48px);
+  }
+  
+  .filters-row {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: clamp(28px, 3vw, 36px);
+  }
+  
+  .data-table {
+    min-width: 1400px;
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: clamp(20px, 2vw, 28px) clamp(24px, 2vw, 32px);
+  }
+  
+  .modal {
+    max-width: clamp(620px, 50vw, 800px);
+  }
+  
+  .modal-header,
+  .modal-form {
+    padding: clamp(32px, 3vw, 44px);
+  }
+  
+  .modal-header h3 {
+    font-size: clamp(24px, 2vw, 32px);
+  }
+}
+
+/* Ultra-wide Desktop - 1920px+ */
+@media (min-width: 1920px) {
+  .appointments-management {
+    max-width: 1800px;
+    margin: 0 auto;
+    padding: clamp(40px, 2vw, 56px) clamp(48px, 3vw, 80px);
+  }
+  
+  .page-header h1 {
+    font-size: clamp(52px, 3vw, 68px);
+  }
+  
+  .page-header p {
+    font-size: clamp(24px, 1vw, 32px);
+  }
+  
+  .data-table {
+    min-width: 1600px;
+  }
+  
+  .modal {
+    max-width: clamp(680px, 45vw, 900px);
+  }
+}
+
+/* Extra Ultra-wide - 2560px+ */
+@media (min-width: 2560px) {
+  .appointments-management {
+    max-width: 2200px;
+    padding: clamp(48px, 2vw, 64px) clamp(64px, 3vw, 100px);
+  }
+  
+  .page-header h1 {
+    font-size: clamp(60px, 2vw, 76px);
+  }
+  
+  .page-header p {
+    font-size: clamp(28px, 1vw, 36px);
+  }
+  
+  .data-table {
+    min-width: 1800px;
+  }
+  
+  .modal {
+    max-width: clamp(760px, 40vw, 1000px);
+  }
+}
+
+/* Device-specific optimizations */
+
+/* iPhone SE and similar compact devices */
+@media (max-width: 375px) and (max-height: 667px) {
+  .page-header h1 {
+    font-size: clamp(18px, 5vw, 22px);
+  }
+  
+  .data-table {
+    min-width: 580px;
+    font-size: 11px;
+  }
+  
+  .modal {
+    margin: 4px;
+    width: calc(100% - 8px);
+  }
+}
+
+/* iPad Mini portrait */
+@media (min-width: 744px) and (max-width: 834px) and (orientation: portrait) {
+  .filters-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .data-table {
+    min-width: 850px;
+  }
+}
+
+/* iPad Pro and large tablets */
+@media (min-width: 1024px) and (max-width: 1366px) {
+  .filters-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .data-table {
+    min-width: 1150px;
+  }
+}
+
+/* Landscape mobile optimizations */
+@media (max-height: 500px) and (orientation: landscape) {
+  .page-header {
+    padding: clamp(12px, 3vw, 20px) clamp(16px, 4vw, 24px);
+    margin-bottom: clamp(8px, 2vw, 16px);
+  }
+  
+  .page-header h1 {
+    font-size: clamp(20px, 5vw, 28px);
+    margin-bottom: clamp(4px, 1vw, 8px);
+  }
+  
+  .page-header p {
+    font-size: clamp(12px, 3vw, 16px);
+  }
+  
+  .filters-section {
+    padding: clamp(12px, 3vw, 20px);
+  }
+  
+  .modal {
+    max-height: 90vh;
+  }
+  
+  .modal-header,
+  .modal-form {
+    padding: clamp(12px, 3vw, 20px);
+  }
+}
+
+/* High DPI / Retina displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .data-table th,
+  .data-table td {
+    border-width: 0.5px;
+  }
+  
+  .status-badge,
+  .vehicle-size {
+    border-width: 0.5px;
+  }
+  
+  .filter-group input,
+  .filter-group select,
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    border-width: 1px;
+  }
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .data-table tr,
+  .filter-group input,
+  .filter-group select,
+  .cancel-btn,
+  .save-btn,
+  .modal {
+    transition: none;
+  }
+  
+  .data-table tr:hover {
+    transform: none;
+  }
+  
+  .loading-spinner {
+    animation: none;
+    border: 4px solid #667eea;
+  }
+}
+
+/* Print styles */
+@media print {
+  .appointments-management {
+    padding: 0 !important;
+    background: white !important;
+  }
+  
+  .page-header,
+  .filters-section,
+  .table-container {
+    background: white !important;
+    box-shadow: none !important;
+    border: 1px solid #000 !important;
+    page-break-inside: avoid;
+  }
+  
+  .modal-overlay {
+    display: none !important;
+  }
+  
+  .data-table {
+    min-width: 100% !important;
+    font-size: 10px !important;
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: 4px 6px !important;
+    border: 1px solid #000 !important;
+  }
+  
+  .data-table tr:hover {
+    background: transparent !important;
+    transform: none !important;
+  }
+  
+  .status-badge,
+  .vehicle-size {
+    background: white !important;
+    color: black !important;
+    border: 1px solid #000 !important;
+    font-size: 8px !important;
+    padding: 2px 4px !important;
+  }
+  
+  .page-header h1 {
+    font-size: 24px !important;
+    color: black !important;
+  }
+  
+  .page-header p {
+    font-size: 14px !important;
+    color: black !important;
   }
 }
 </style>

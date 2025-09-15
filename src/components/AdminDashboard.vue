@@ -19,22 +19,8 @@
         </div>
         <div class="stat-content">
           <h3>Total Appointments</h3>
-          <p class="stat-number">{{ appointments.length }}</p>
+          <p class="stat-number">{{ confirmedAppointments.length }}</p>
           <span class="stat-change positive">+12% from last week</span>
-        </div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12,6 12,12 16,14"/>
-          </svg>
-        </div>
-        <div class="stat-content">
-          <h3>Pending Appointments</h3>
-          <p class="stat-number">{{ pendingAppointments }}</p>
-          <span class="stat-change neutral">Awaiting confirmation</span>
         </div>
       </div>
       
@@ -93,7 +79,7 @@
           <p>Check and manage customer appointments</p>
         </router-link>
         
-        <div class="quick-action-card">
+        <router-link to="/admin/customers" class="quick-action-card">
           <div class="action-icon">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -102,9 +88,9 @@
           </div>
           <h3>Customer Management</h3>
           <p>View and manage customer information</p>
-        </div>
-        
-        <div class="quick-action-card">
+        </router-link>
+
+        <router-link to="/admin/payments" class="quick-action-card">
           <div class="action-icon">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="1" x2="12" y2="23"/>
@@ -113,7 +99,7 @@
           </div>
           <h3>Payment Tracking</h3>
           <p>Monitor payments and transactions</p>
-        </div>
+        </router-link>
       </div>
     </div>
 
@@ -153,11 +139,6 @@ const serviceRates = ref([])
 const appointments = ref([])
 const serviceTypes = ref([])
 
-// Computed properties
-const pendingAppointments = computed(() => 
-  appointments.value.filter(apt => apt.status === 'pending').length
-)
-
 const todayRevenue = computed(() => {
   const today = new Date().toISOString().split('T')[0]
   return appointments.value
@@ -192,6 +173,12 @@ const getServiceName = (serviceTypeID) => {
   const serviceType = serviceTypes.value.find(type => type.serviceTypeID === serviceTypeID)
   return serviceType?.serviceTypeName || 'Unknown Service'
 }
+
+// Computed
+
+const confirmedAppointments = computed(() => {
+  return appointments.value.filter(apt => apt.status === 'confirmed')
+})
 
 // Using imported getImageUrl utility function
 
@@ -361,11 +348,6 @@ onMounted(() => {
   font-size: 12px;
   font-weight: 500;
   text-transform: capitalize;
-}
-
-.status-badge.pending {
-  background: #fef5e7;
-  color: #d69e2e;
 }
 
 .status-badge.confirmed {

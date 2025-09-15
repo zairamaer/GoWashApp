@@ -34,31 +34,39 @@ api.interceptors.request.use(
   }
 )
 
-// Response interceptor to handle auth errors
+// Response interceptor - FIXED VERSION
 api.interceptors.response.use(
   (response) => {
-    // Log successful responses for debugging
-    console.log('API Response:', response.config.url, response.status, response.data)
+
     return response
   },
   (error) => {
-    // Log errors for debugging
-    console.error('API Error:', error.config?.url, error.response?.status, error.response?.data)
     
     if (error.response?.status === 401) {
-      // Clear both admin and customer tokens
-      localStorage.removeItem('admin_token')
-      localStorage.removeItem('admin_user')
-      localStorage.removeItem('customer_token')
-      localStorage.removeItem('customer_user')
+      // Check if this is a login attempt (don't redirect on login failures)
+      const isLoginAttempt = error.config?.url?.includes('/login')
       
-      // Redirect based on current route
-      const currentPath = window.location.pathname
-      if (currentPath.startsWith('/admin')) {
-        window.location.href = '/admin/login'
-      } else if (currentPath.startsWith('/customer')) {
-        window.location.href = '/customer/login'
+      if (!isLoginAttempt) {
+        // Only redirect if NOT a login attempt (i.e., authenticated user's token expired)
+        localStorage.removeItem('admin_token')
+        localStorage.removeItem('admin_user')
+        localStorage.removeItem('customer_token')
+        localStorage.removeItem('customer_user')
+        
+        // Use Vue Router instead of window.location to prevent refresh
+        const currentPath = window.location.pathname
+        if (currentPath.startsWith('/admin')) {
+          // Import router dynamically to avoid circular dependencies
+          import('../router').then(({ default: router }) => {
+            router.push('/admin/login')
+          })
+        } else if (currentPath.startsWith('/customer')) {
+          import('../router').then(({ default: router }) => {
+            router.push('/customer/login')
+          })
+        }
       }
+      // For login attempts, just let the error pass through to the component
     }
     return Promise.reject(error)
   }
@@ -213,11 +221,34 @@ export const serviceApi = {
 
   async updateServiceType(id, serviceTypeData) {
     try {
-      console.log('Updating service type with direct service-types endpoint:', { id, serviceTypeData })
+      console.log('=== UPDATE SERVICE TYPE START ===')
+      console.log('ID:', id)
+      console.log('Service Type Data:', serviceTypeData)
+      console.log('Has image file:', !!serviceTypeData.imageFile)
       
       // If there's an image file, use FormData
       if (serviceTypeData.imageFile) {
-        console.log('Updating with image file using FormData')
+        console.log('=== UPDATING WITH IMAGE FILE ===')
+        
+        // Validate file before sending
+        const file = serviceTypeData.imageFile
+        console.log('File details:', {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          lastModified: file.lastModified
+        })
+        
+        // Check file size (2MB limit)
+        if (file.size > 2048 * 1024) {
+          throw new Error('Image file is too large. Maximum size is 2MB.')
+        }
+        
+        // Check file type
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/svg+xml']
+        if (!allowedTypes.includes(file.type)) {
+          throw new Error('Invalid file type. Please upload JPEG, PNG, JPG, GIF, or SVG images only.')
+        }
         
         const formData = new FormData()
         formData.append('serviceTypeName', serviceTypeData.serviceTypeName)
@@ -225,58 +256,117 @@ export const serviceApi = {
         formData.append('serviceTypeImage', serviceTypeData.imageFile)
         formData.append('_method', 'PUT')
         
-        console.log('FormData contents for update with image:', {
-          serviceTypeName: serviceTypeData.serviceTypeName,
-          serviceTypeDescription: serviceTypeData.serviceTypeDescription,
-          hasImageFile: true,
-          imageFileName: serviceTypeData.imageFile.name
-        })
-        
-        // Try POST with method spoofing first (common for file uploads in Laravel)
-        let response
-        try {
-          response = await api.post(`/service-types/${id}`, formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data'
-            }
-          })
-          console.log('Update with image successful using POST method spoofing')
-        } catch (postError) {
-          console.log('POST method failed, trying PUT method:', postError.message)
-          response = await api.put(`/service-types/${id}`, formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data'
-            }
-          })
-          console.log('Update with image successful using PUT method')
+        // Debug: Log all FormData entries
+        console.log('=== FORM DATA CONTENTS ===')
+        for (let [key, value] of formData.entries()) {
+          if (value instanceof File) {
+            console.log(`${key}:`, { name: value.name, size: value.size, type: value.type })
+          } else {
+            console.log(`${key}:`, value)
+          }
         }
         
-        console.log('Service type updated successfully with image:', response.data)
+        console.log(`Making POST request to: /service-types/${id}`)
+        
+        const response = await api.post(`/service-types/${id}`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          },
+          timeout: 30000,
+          validateStatus: function (status) {
+            // Don't throw error for any status code so we can debug
+            return status < 500; // Only throw for 5xx server errors
+          }
+        })
+        
+        console.log('=== RESPONSE RECEIVED ===')
+        console.log('Status:', response.status)
+        console.log('Status Text:', response.statusText)
+        console.log('Response Data:', response.data)
+        console.log('Response Headers:', response.headers)
+        
+        if (response.status === 422) {
+          console.log('=== VALIDATION ERRORS ===')
+          console.log('Errors object:', response.data.errors)
+          const errors = response.data.errors || {}
+          const errorMessages = Object.entries(errors).map(([field, messages]) => 
+            `${field}: ${messages.join(', ')}`
+          ).join('; ')
+          throw new Error(`Validation failed: ${errorMessages || response.data.message || 'Unknown validation error'}`)
+        }
+        
+        if (response.status !== 200 && response.status !== 201) {
+          throw new Error(`Server responded with status ${response.status}: ${response.data.message || response.statusText}`)
+        }
+        
+        console.log('✅ Update with image successful')
         return response.data
+        
       } else {
-        // No image file, use regular JSON request
-        console.log('Updating without image file using JSON')
+        console.log('=== UPDATING WITHOUT IMAGE FILE ===')
         
         const updateData = {
           serviceTypeName: serviceTypeData.serviceTypeName,
           serviceTypeDescription: serviceTypeData.serviceTypeDescription || ''
         }
         
-        console.log('JSON data for update without image:', updateData)
+        console.log('JSON data for update:', updateData)
+        console.log(`Making PUT request to: /service-types/${id}`)
         
-        const response = await api.put(`/service-types/${id}`, updateData)
-        console.log('Service type updated successfully without image:', response.data)
+        const response = await api.put(`/service-types/${id}`, updateData, {
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000,
+          validateStatus: function (status) {
+            return status < 500;
+          }
+        })
+        
+        console.log('=== RESPONSE RECEIVED (JSON) ===')
+        console.log('Status:', response.status)
+        console.log('Response Data:', response.data)
+        
+        if (response.status === 422) {
+          const errors = response.data.errors || {}
+          const errorMessages = Object.entries(errors).map(([field, messages]) => 
+            `${field}: ${messages.join(', ')}`
+          ).join('; ')
+          throw new Error(`Validation failed: ${errorMessages || response.data.message || 'Unknown validation error'}`)
+        }
+        
+        if (response.status !== 200) {
+          throw new Error(`Server responded with status ${response.status}: ${response.data.message || response.statusText}`)
+        }
+        
+        console.log('✅ Update without image successful')
         return response.data
       }
     } catch (error) {
-      console.error('Error updating service type:', error)
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        hasImageFile: !!serviceTypeData.imageFile
-      })
-      throw error
+      console.log('=== ERROR CAUGHT ===')
+      console.log('Error object:', error)
+      console.log('Error message:', error.message)
+      console.log('Error code:', error.code)
+      console.log('Error response:', error.response)
+      console.log('Error config:', error.config)
+      
+      // If it's our custom error, re-throw it
+      if (error.message.includes('Validation failed') || 
+          error.message.includes('too large') || 
+          error.message.includes('Invalid file type') ||
+          error.message.includes('Server responded with status')) {
+        throw error
+      }
+      
+      // Handle network errors
+      if (error.code === 'ECONNABORTED') {
+        throw new Error('Request timeout - file might be too large or connection is slow')
+      } else if (error.message === 'Network Error') {
+        throw new Error('Network connection failed - check your internet connection and server status')
+      }
+      
+      // For any other error, provide full details
+      throw new Error(`Update failed: ${error.message} (Code: ${error.code || 'unknown'})`)
     }
   },
 
@@ -328,6 +418,47 @@ export const serviceApi = {
   }
 }
 
+// Customer API
+export const customerApi = {
+  // Get all customers
+  async getCustomers() {
+    const response = await api.get('/customers')
+    // Handle the data wrapper - the API returns { data: [...] }
+    return response.data.data || response.data
+  },
+
+  // Get a specific customer by ID
+  async getCustomer(id) {
+    const response = await api.get(`/customers/${id}`)
+    return response.data
+  },
+
+  // Update customer information
+  async updateCustomer(id, customerData) {
+    const response = await api.put(`/customers/${id}`, customerData)
+    return response.data
+  },
+
+  // Get customer with appointments by customer ID
+  async getCustomerWithAppointments(customerId) {
+    // First try the individual customer endpoint
+    try {
+      const response = await api.get(`/customers/${customerId}`)
+      // Handle the data wrapper if it exists
+      return response.data.data || response.data
+    } catch (error) {
+      // If individual endpoint fails, get all customers and filter
+      console.log('Individual customer endpoint failed, using all customers endpoint')
+      const allCustomers = await this.getCustomers()
+      const customer = allCustomers.find(c => c.id == customerId)
+      if (!customer) {
+        throw new Error('Customer not found')
+      }
+      return customer
+    }
+  }
+}
+
 // Appointments API
 export const appointmentApi = {
   async getAppointments() {
@@ -358,10 +489,83 @@ export const appointmentApi = {
   async getCustomerAppointments() {
     const response = await api.get('/customer/appointments')
     return response.data
+  },
+
+  async getAppointmentsByDate(date) {
+    // Since there's no specific date endpoint, get all appointments and filter on frontend
+    const response = await api.get('/appointments')
+    const allAppointments = response.data
+    
+    // Filter appointments for the specific date
+    const appointmentsForDate = allAppointments.filter(appointment => {
+      const appointmentDate = appointment.appointmentDateTime.split(' ')[0] // Get date part
+      return appointmentDate === date
+    })
+    
+    return appointmentsForDate
+  },
+
+  async getAppointmentsGroupedByCustomer() {
+    const response = await api.get('/appointments')
+    const allAppointments = response.data
+    
+    // Group appointments by customer
+    const groupedByCustomer = {}
+    
+    allAppointments.forEach(appointment => {
+      const customerId = appointment.customerID
+      const customer = appointment.customer
+      
+      if (!groupedByCustomer[customerId]) {
+        groupedByCustomer[customerId] = {
+          customer: customer,
+          appointments: [],
+          nearestAppointment: null,
+          appointmentCount: 0
+        }
+      }
+      
+      // Only include confirmed and completed appointments
+      if (appointment.status === 'confirmed' || appointment.status === 'completed') {
+        groupedByCustomer[customerId].appointments.push(appointment)
+        groupedByCustomer[customerId].appointmentCount++
+        
+        // Find nearest appointment
+        const appointmentDate = new Date(appointment.appointmentDateTime)
+        if (!groupedByCustomer[customerId].nearestAppointment || 
+            appointmentDate < new Date(groupedByCustomer[customerId].nearestAppointment.appointmentDateTime)) {
+          groupedByCustomer[customerId].nearestAppointment = appointment
+        }
+      }
+    })
+    
+    // Convert to array and sort by nearest appointment date
+    const customersWithAppointments = Object.values(groupedByCustomer)
+      .filter(customerGroup => customerGroup.appointmentCount > 0)
+      .sort((a, b) => {
+        if (!a.nearestAppointment && !b.nearestAppointment) return 0
+        if (!a.nearestAppointment) return 1
+        if (!b.nearestAppointment) return -1
+        return new Date(a.nearestAppointment.appointmentDateTime) - new Date(b.nearestAppointment.appointmentDateTime)
+      })
+    
+    return customersWithAppointments
+  },
+
+  async getConfirmedAppointments() {
+    const response = await api.get('/appointments')
+    const allAppointments = response.data
+    
+    // Filter to only confirmed appointments and sort by date
+    const confirmedAppointments = allAppointments
+      .filter(appointment => appointment.status === 'confirmed')
+      .sort((a, b) => new Date(a.appointmentDateTime) - new Date(b.appointmentDateTime))
+    
+    return confirmedAppointments
   }
 }
 
-// Payments API
+// Payments API - Enhanced with status updates
 export const paymentApi = {
   async getPayments() {
     const response = await api.get('/payments')
@@ -386,6 +590,66 @@ export const paymentApi = {
   async checkPaymentStatus(paymentId) {
     const response = await api.get(`/payments/status/${paymentId}`)
     return response.data
+  },
+
+  // Get payment by appointment ID using existing payments endpoint
+  async getPaymentByAppointment(appointmentId) {
+    try {
+      const response = await api.get('/payments')
+      const allPayments = response.data.data || response.data
+      const payment = allPayments.find(p => p.appointmentID == appointmentId)
+      return payment || null
+    } catch (error) {
+      console.error('Error fetching payment by appointment:', error)
+      return null
+    }
+  },
+
+  // Update payment status to paid (called by webhook or success handler)
+  async markPaymentAsPaid(paymentId, transactionData = {}) {
+    const paymentData = {
+      status: 'paid',
+      paymentDateTime: new Date().toISOString(),
+      ...transactionData
+    }
+    
+    try {
+      const response = await api.put(`/payments/${paymentId}`, paymentData)
+      console.log('Payment marked as paid:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('Error marking payment as paid:', error)
+      throw error
+    }
+  },
+
+  // Update payment status to failed
+  async markPaymentAsFailed(paymentId, errorReason = '') {
+    const paymentData = {
+      status: 'failed',
+      error_reason: errorReason,
+      paymentDateTime: new Date().toISOString()
+    }
+    
+    try {
+      const response = await api.put(`/payments/${paymentId}`, paymentData)
+      console.log('Payment marked as failed:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('Error marking payment as failed:', error)
+      throw error
+    }
+  },
+
+  // Get payment status for appointment
+  async getAppointmentPaymentStatus(appointmentId) {
+    try {
+      const payment = await this.getPaymentByAppointment(appointmentId)
+      return payment ? payment.status : 'pending'
+    } catch (error) {
+      console.error('Error getting payment status for appointment:', error)
+      return 'pending'
+    }
   }
 }
 

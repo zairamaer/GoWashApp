@@ -1,132 +1,539 @@
 <template>
-  <div class="customer-appointments">
-    <div class="appointments-header">
-      <h1>My Appointments</h1>
-      <p>View and manage your car wash appointments</p>
+    <div class="customer-appointments">
+        <div class="appointments-overview">
+            <div class="professional-header">
+                <div class="header-content">
+                    <div class="title-section">
+                        <h1>My Appointments</h1>
+                        <p>Comprehensive dashboard for your car wash appointments</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="overview-cards">
+                <div class="overview-card upcoming">
+                    <div class="card-header">
+                        <div class="card-icon">🗓️</div>
+                        <div class="card-badge">Active</div>
+                    </div>
+                    <div class="card-content">
+                        <h3>Upcoming</h3>
+                        <span class="card-number">{{ upcomingCount }}</span>
+                        <p>{{ nextAppointmentText }}</p>
+                    </div>
+                </div>
+                
+                <div class="overview-card total">
+                    <div class="card-header">
+                        <div class="card-icon">📊</div>
+                        <div class="card-badge">Analytics</div>
+                    </div>
+                    <div class="card-content">
+                        <h3>Total</h3>
+                        <span class="card-number">{{ totalCount }}</span>
+                        <p>All time appointments</p>
+                    </div>
+                </div>
+                
+                <div class="overview-card completed">
+                    <div class="card-header">
+                        <div class="card-icon">✅</div>
+                        <div class="card-badge">Success</div>
+                    </div>
+                    <div class="card-content">
+                        <h3>Completed</h3>
+                        <span class="card-number">{{ completedCount }}</span>
+                        <p>Successfully finished</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="view-toggle">
+                <button class="toggle-btn" :class="{ active: activeView === 'schedules' }" @click="setActiveView('schedules')">
+                    <span class="btn-icon">📅</span>
+                    Schedules
+                </button>
+                <button class="toggle-btn" :class="{ active: activeView === 'history' }" @click="setActiveView('history')">
+                    <span class="btn-icon">📜</span>
+                    History
+                </button>
+            </div>
+        </div>
+
+        <div class="appointments-container">
+            <div class="appointments-filters">
+              <div v-if="activeView === 'history'" class="filter-group">
+                  <label>Filter by Status:</label>
+                  <select v-model="statusFilter" @change="filterAppointments">
+                      <option value="">All</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                  </select>
+              </div>
+              <div v-if="activeView === 'schedules'" class="filter-group">
+                  <label>Sort by:</label>
+                  <select v-model="sortBy" @change="sortAppointments">
+                      <option value="all">All</option>
+                      <option value="today">Today</option>
+                      <option value="week">This Week</option>
+                      <option value="month">This Month</option>
+                  </select>
+              </div>
+            </div>
+
+            <div v-if="loading" class="loading-state">
+                <div class="loading-spinner"></div>
+                <p>Loading appointments...</p>
+            </div>
+            
+            <div v-else-if="error" class="error-state">
+                <div class="error-icon">⚠️</div>
+                <h3>Error Loading Appointments</h3>
+                <p>{{ error }}</p>
+                <button @click="loadAppointments" class="retry-btn">Try Again</button>
+            </div>
+            
+            <div v-else-if="filteredAppointments.length > 0" class="appointments-list">
+                <div v-for="appointment in filteredAppointments" :key="appointment.id" 
+                     class="appointment-card" :class="[appointment.status]">
+                    <div class="appointment-header">
+                        <div class="appointment-id">
+                            <h3>Appointment #{{ getAppointmentNumber(appointment) }}</h3>
+                        </div>
+                        <div class="appointment-status" :class="appointment.status">
+                            {{ appointment.status.replace('-', ' ').toUpperCase() }}
+                        </div>
+                    </div>
+                    
+                    <div class="appointment-details">
+                        <div class="detail-row">
+                            <span class="detail-label">📅 Date:</span>
+                            <span class="detail-value">{{ formatDate(appointment.appointmentDate) }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">🕐 Time:</span>
+                            <span class="detail-value">{{ appointment.appointmentTime }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">🚗 Vehicle:</span>
+                            <span class="detail-value">{{ appointment.vehicleType || 'Not specified' }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">🔧 Service:</span>
+                            <span class="detail-value">{{ appointment.serviceName || 'Service ID: ' + appointment.service_rate_id }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">💰 Price:</span>
+                            <span class="detail-value">₱{{ appointment.price || '0.00' }}</span>
+                        </div>
+                        <div v-if="appointment.instructions" class="detail-row">
+                            <span class="detail-label">📝 Instructions:</span>
+                            <span class="detail-value">{{ appointment.instructions }}</span>
+                        </div>
+                    </div>
+
+                    <div class="appointment-actions">
+                        <button v-if="appointment.status === 'completed'" 
+                                @click="bookAgain(appointment)" 
+                                class="action-btn book-again-btn">
+                            Book Again
+                        </button>
+                        <button @click="viewDetails(appointment)" 
+                                class="action-btn details-btn">
+                            View Details
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div v-else class="empty-state">
+                <div class="empty-icon">📅</div>
+                <h3>No {{ activeView === 'schedules' ? 'scheduled' : 'historical' }} appointments found</h3>
+                <p>{{ getEmptyStateMessage() }}</p>
+                <router-link v-if="activeView === 'schedules'" to="/customer/book" class="book-now-btn">Book Your First Appointment</router-link>
+            </div>
+        </div>
+
+        <!-- Appointment Details Modal -->
+        <div v-if="showDetailsModal" class="modal-overlay" @click="closeDetailsModal">
+            <div class="modal-content" @click.stop>
+                <div class="modal-header">
+                    <h2>Appointment Details</h2>
+                </div>
+                
+                <div class="modal-body" v-if="selectedAppointment">
+                    <div class="detail-card">
+                        <div class="appointment-info">
+                            <div class="appointment-number">
+                                <span class="number-label">Appointment #</span>
+                                <span class="number-value">{{ getAppointmentNumber(selectedAppointment) }}</span>
+                            </div>
+                            <div class="status-badge" :class="selectedAppointment.status">
+                                {{ selectedAppointment.status.replace('-', ' ').toUpperCase() }}
+                            </div>
+                        </div>
+                        
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <div class="detail-icon">📅</div>
+                                <div class="detail-content">
+                                    <h4>Date</h4>
+                                    <p>{{ formatDate(selectedAppointment.appointmentDate) }}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-item">
+                                <div class="detail-icon">🕐</div>
+                                <div class="detail-content">
+                                    <h4>Time</h4>
+                                    <p>{{ selectedAppointment.appointmentTime }}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-item">
+                                <div class="detail-icon">🚗</div>
+                                <div class="detail-content">
+                                    <h4>Vehicle</h4>
+                                    <p>{{ selectedAppointment.vehicleType || 'Not specified' }}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-item">
+                                <div class="detail-icon">🔧</div>
+                                <div class="detail-content">
+                                    <h4>Service</h4>
+                                    <p>{{ selectedAppointment.serviceName || 'Service ID: ' + selectedAppointment.service_rate_id }}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-item">
+                                <div class="detail-icon">💰</div>
+                                <div class="detail-content">
+                                    <h4>Price</h4>
+                                    <p class="price">₱{{ selectedAppointment.price || '0.00' }}</p>
+                                </div>
+                            </div>
+                            
+                            <div v-if="selectedAppointment.instructions" class="detail-item full-width">
+                                <div class="detail-icon">📝</div>
+                                <div class="detail-content">
+                                    <h4>Special Instructions</h4>
+                                    <p>{{ selectedAppointment.instructions }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button v-if="selectedAppointment && selectedAppointment.status === 'completed'" 
+                            @click="bookAgain(selectedAppointment)" 
+                            class="modal-btn primary-btn">
+                        Book Again
+                    </button>
+                    <button @click="closeDetailsModal" class="modal-btn secondary-btn">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div v-if="showToast" class="toast-notification" :class="toastType" @click="hideToast">
+            <div class="toast-content">
+                <span class="toast-message">{{ toastMessage }}</span>
+                <button class="toast-close" @click="hideToast">&times;</button>
+            </div>
+        </div>
     </div>
-
-    <div class="appointments-container">
-      <div class="appointments-filters">
-        <div class="filter-group">
-          <label>Filter by Status:</label>
-          <select v-model="statusFilter" @change="filterAppointments">
-            <option value="">All</option>
-            <option value="pending">Pending</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="in-progress">In Progress</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label>Sort by:</label>
-          <select v-model="sortBy" @change="sortAppointments">
-            <option value="date">Date</option>
-            <option value="service">Service</option>
-            <option value="status">Status</option>
-          </select>
-        </div>
-      </div>
-
-      <div v-if="filteredAppointments.length > 0" class="appointments-list">
-        <div v-for="appointment in filteredAppointments" :key="appointment.id" 
-             class="appointment-card" :class="appointment.status">
-          <div class="appointment-header">
-            <div class="service-info">
-              <h3>{{ appointment.serviceName }}</h3>
-              <span class="service-price">${{ appointment.price }}</span>
-            </div>
-            <div class="appointment-status" :class="appointment.status">
-              {{ appointment.status.replace('-', ' ').toUpperCase() }}
-            </div>
-          </div>
-          
-          <div class="appointment-details">
-            <div class="detail-row">
-              <span class="detail-label">Date:</span>
-              <span class="detail-value">{{ formatDate(appointment.appointmentDate) }}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Time:</span>
-              <span class="detail-value">{{ appointment.appointmentTime }}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Vehicle:</span>
-              <span class="detail-value">{{ appointment.vehicleType }}</span>
-            </div>
-            <div v-if="appointment.instructions" class="detail-row">
-              <span class="detail-label">Instructions:</span>
-              <span class="detail-value">{{ appointment.instructions }}</span>
-            </div>
-          </div>
-
-          <div class="appointment-actions">
-            <button v-if="appointment.status === 'pending'" 
-                    @click="cancelAppointment(appointment.id)" 
-                    class="action-btn cancel-btn">
-              Cancel
-            </button>
-            <button v-if="appointment.status === 'completed'" 
-                    @click="bookAgain(appointment)" 
-                    class="action-btn book-again-btn">
-              Book Again
-            </button>
-            <button @click="viewDetails(appointment)" 
-                    class="action-btn details-btn">
-              View Details
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div v-else class="empty-state">
-        <div class="empty-icon">📅</div>
-        <h3>No appointments found</h3>
-        <p>{{ statusFilter ? `No ${statusFilter} appointments` : 'You haven\'t booked any appointments yet' }}</p>
-        <router-link to="/customer/book" class="book-now-btn">Book Your First Appointment</router-link>
-      </div>
-    </div>
-  </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { appointmentApi, paymentApi } from '../services/api'
+import { appointmentApi, paymentApi, customerApi } from '../services/api'
 
 const router = useRouter()
 const route = useRoute()
 
 const statusFilter = ref('')
-const sortBy = ref('date')
+const sortBy = ref('all')
 const appointments = ref([])
 const loading = ref(false)
 const error = ref('')
+const activeView = ref('schedules') // 'schedules' or 'history'
 
+// Modal state
+const showDetailsModal = ref(false)
+const selectedAppointment = ref(null)
+
+// Toast notification state
+const showToast = ref(false)
+const toastMessage = ref('')
+const toastType = ref('success') // 'success' or 'error'
+
+// Toast functions
+const showSuccessToast = (message) => {
+  toastMessage.value = message
+  toastType.value = 'success'
+  showToast.value = true
+  setTimeout(() => {
+    showToast.value = false
+  }, 5000) // Hide after 5 seconds
+}
+
+const showErrorToast = (message) => {
+  toastMessage.value = message
+  toastType.value = 'error'
+  showToast.value = true
+  setTimeout(() => {
+    showToast.value = false
+  }, 5000) // Hide after 5 seconds
+}
+
+const hideToast = () => {
+  showToast.value = false
+}
+
+// Helper function to convert 12-hour time to 24-hour for proper date comparison
+const convertTo24Hour = (timeString) => {
+  if (!timeString) return '00:00:00'
+  
+  try {
+    // If already in 24-hour format, return as is
+    if (!timeString.includes('AM') && !timeString.includes('PM')) {
+      return timeString.includes(':') ? timeString : '00:00:00'
+    }
+    
+    // Convert from 12-hour to 24-hour format
+    const [time, period] = timeString.split(' ')
+    let [hours, minutes] = time.split(':')
+    hours = parseInt(hours, 10)
+    
+    if (period === 'AM' && hours === 12) {
+      hours = 0
+    } else if (period === 'PM' && hours !== 12) {
+      hours += 12
+    }
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes}:00`
+  } catch (error) {
+    console.error('Error converting time:', error)
+    return '00:00:00'
+  }
+}
+
+// Improved helper function to check if appointment is in the past
+const isAppointmentInPast = (appointment) => {
+  try {
+    const appointmentDateTime = new Date(`${appointment.appointmentDate} ${convertTo24Hour(appointment.appointmentTime)}`)
+    const now = new Date()
+    
+    // Add a small buffer (5 minutes) to avoid showing appointments that just started
+    const bufferTime = 5 * 60 * 1000 // 5 minutes in milliseconds
+    return (appointmentDateTime.getTime() + bufferTime) < now.getTime()
+  } catch (error) {
+    console.error('Error checking if appointment is in past:', error)
+    return false
+  }
+}
+
+// Computed properties for overview cards
+const upcomingCount = computed(() => {
+  return appointments.value.filter(app => 
+    app.status === 'confirmed' && // Only confirmed appointments
+    !isAppointmentInPast(app)
+  ).length
+})
+
+const totalCount = computed(() => {
+  return appointments.value.filter(app => 
+    app.status === 'confirmed'
+  ).length
+})
+
+const completedCount = computed(() => {
+  return appointments.value.filter(app => app.status === 'completed').length
+})
+
+const nextAppointmentText = computed(() => {
+  const upcomingAppointments = appointments.value
+    .filter(app => 
+      app.status === 'confirmed' && // Only confirmed appointments
+      !isAppointmentInPast(app)
+    )
+    .sort((a, b) => {
+      const aDateTime = new Date(`${a.appointmentDate} ${convertTo24Hour(a.appointmentTime)}`)
+      const bDateTime = new Date(`${b.appointmentDate} ${convertTo24Hour(b.appointmentTime)}`)
+      return aDateTime - bDateTime // Nearest first
+    })
+  
+  if (upcomingAppointments.length > 0) {
+    const next = upcomingAppointments[0]
+    const appointmentDate = new Date(next.appointmentDate)
+    const today = new Date()
+    const tomorrow = new Date(today)
+    tomorrow.setDate(today.getDate() + 1)
+    
+    // Reset time to start of day for comparison
+    today.setHours(0, 0, 0, 0)
+    tomorrow.setHours(0, 0, 0, 0)
+    appointmentDate.setHours(0, 0, 0, 0)
+    
+    if (appointmentDate.getTime() === today.getTime()) {
+      return `Next: Today ${next.appointmentTime}`
+    } else if (appointmentDate.getTime() === tomorrow.getTime()) {
+      return `Next: Tomorrow ${next.appointmentTime}`
+    } else {
+      return `Next: ${formatDate(next.appointmentDate)} ${next.appointmentTime}`
+    }
+  }
+  return 'No upcoming appointments'
+})
+
+// Add this computed property to generate appointment numbers
+const getAppointmentNumber = (appointment) => {
+  // Get all confirmed appointments for this customer, sorted by creation date
+  const confirmedAppointments = appointments.value
+    .filter(app => app.status === 'confirmed' || app.status === 'completed')
+    .sort((a, b) => {
+      // Sort by appointment date/time to maintain consistent ordering
+      const aDateTime = new Date(`${a.appointmentDate} ${convertTo24Hour(a.appointmentTime)}`)
+      const bDateTime = new Date(`${b.appointmentDate} ${convertTo24Hour(b.appointmentTime)}`)
+      return aDateTime - bDateTime
+    })
+  
+  // Find the index of this appointment and add 1 for human-readable numbering
+  const appointmentIndex = confirmedAppointments.findIndex(app => app.id === appointment.id)
+  return appointmentIndex !== -1 ? appointmentIndex + 1 : 0
+}
+
+// Helper functions for date filtering
+const isToday = (date) => {
+  const today = new Date()
+  const checkDate = new Date(date)
+  today.setHours(0, 0, 0, 0)
+  checkDate.setHours(0, 0, 0, 0)
+  return checkDate.getTime() === today.getTime()
+}
+
+const isThisWeek = (date) => {
+  const today = new Date()
+  const checkDate = new Date(date)
+  const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay()))
+  const endOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 6))
+  startOfWeek.setHours(0, 0, 0, 0)
+  endOfWeek.setHours(23, 59, 59, 999)
+  return checkDate >= startOfWeek && checkDate <= endOfWeek
+}
+
+const isThisMonth = (date) => {
+  const today = new Date()
+  const checkDate = new Date(date)
+  return checkDate.getMonth() === today.getMonth() && 
+         checkDate.getFullYear() === today.getFullYear()
+}
+
+// Filter appointments based on active view and status filter
 const filteredAppointments = computed(() => {
   let filtered = [...appointments.value]
   
-  // Filter by status
+  
+  // First filter by active view (schedules vs history)
+  if (activeView.value === 'schedules') {
+    // Schedules: ONLY confirmed appointments that are NOT in the past (exclude pending)
+    filtered = filtered.filter(app => 
+      app.status === 'confirmed' && // Only confirmed appointments
+      !isAppointmentInPast(app)
+    )
+    
+    // Apply date range filter for schedules
+    if (sortBy.value === 'today') {
+      filtered = filtered.filter(app => isToday(app.appointmentDate))
+    } else if (sortBy.value === 'week') {
+      filtered = filtered.filter(app => isThisWeek(app.appointmentDate))
+    } else if (sortBy.value === 'month') {
+      filtered = filtered.filter(app => isThisMonth(app.appointmentDate))
+    }
+    // 'all' doesn't need additional filtering
+    
+    // Sort schedules by nearest date/time first (ascending order)
+    filtered.sort((a, b) => {
+      const aDateTime = new Date(`${a.appointmentDate} ${convertTo24Hour(a.appointmentTime)}`)
+      const bDateTime = new Date(`${b.appointmentDate} ${convertTo24Hour(b.appointmentTime)}`)
+      return aDateTime - bDateTime // Nearest first
+    })
+    
+  } else if (activeView.value === 'history') {
+    // History: completed and cancelled appointments
+    filtered = filtered.filter(app => 
+      app.status === 'completed' || app.status === 'cancelled'
+    )
+    
+    // Sort history by most recent first (descending order)
+    filtered.sort((a, b) => {
+      const aDateTime = new Date(`${a.appointmentDate} ${convertTo24Hour(b.appointmentTime)}`)
+      const bDateTime = new Date(`${b.appointmentDate} ${convertTo24Hour(b.appointmentTime)}`)
+      return bDateTime - aDateTime // Most recent first
+    })
+  }
+  
+  
+  // Then filter by specific status if selected
   if (statusFilter.value) {
     filtered = filtered.filter(app => app.status === statusFilter.value)
   }
   
-  // Sort appointments
-  filtered.sort((a, b) => {
-    switch (sortBy.value) {
-      case 'date':
-        return new Date(a.appointmentDate) - new Date(b.appointmentDate)
-      case 'service':
-        return a.serviceName.localeCompare(b.serviceName)
-      case 'status':
-        return a.status.localeCompare(b.status)
-      default:
-        return 0
-    }
-  })
-  
   return filtered
 })
+
+// Initialize sortBy based on active view
+watch(activeView, (newView) => {
+  if (newView === 'schedules') {
+    sortBy.value = 'all' // Default to all for schedules
+  } else {
+    sortBy.value = '' // Default to all for history
+  }
+})
+
+// Helper function to check if appointment can be cancelled
+const canCancelAppointment = (appointment) => {
+  return appointment.status === 'pending' && !isAppointmentInPast(appointment)
+}
+
+// Helper function to check if appointment can be modified
+const canModifyAppointment = (appointment) => {
+  return (appointment.status === 'pending' || appointment.status === 'confirmed') && !isAppointmentInPast(appointment)
+}
+
+// Set active view function
+const setActiveView = (view) => {
+  activeView.value = view
+}
+
+// Get empty state message based on active view
+const getEmptyStateMessage = () => {
+  if (activeView.value === 'schedules') {
+    return statusFilter.value 
+      ? `No ${statusFilter.value} appointments found`
+      : "You don't have any scheduled appointments yet"
+  } else {
+    return statusFilter.value 
+      ? `No ${statusFilter.value} appointments found`
+      : "You don't have any appointment history yet"
+  }
+}
+
+// Modal functions
+const viewDetails = (appointment) => {
+  selectedAppointment.value = appointment
+  showDetailsModal.value = true
+}
+
+const closeDetailsModal = () => {
+  showDetailsModal.value = false
+  selectedAppointment.value = null
+}
 
 onMounted(async () => {
   // Check for payment success redirect
@@ -142,28 +549,38 @@ const handlePaymentSuccess = async (appointmentId) => {
     // Check appointment status first
     let appointment = await appointmentApi.getAppointment(appointmentId)
     
+    // Update payment status to paid
+    try {
+      const payment = await paymentApi.getPaymentByAppointment(appointmentId)
+      if (payment) {
+        await paymentApi.markPaymentAsPaid(payment.paymentID)
+      }
+    } catch (paymentError) {
+      console.error('Error updating payment status:', paymentError)
+    }
+    
     if (appointment && appointment.status === 'confirmed') {
       // Already confirmed by webhook
-      alert('Payment successful! Your appointment has been confirmed.')
+      showSuccessToast('🎉 Payment successful! Your appointment has been confirmed.')
     } else if (appointment && appointment.status === 'pending') {
       // Webhook might not have processed yet, try to manually confirm
       try {
         // Update appointment status to confirmed
         await appointmentApi.updateAppointment(appointmentId, { status: 'confirmed' })
-        alert('Payment successful! Your appointment has been confirmed.')
+        showSuccessToast('🎉 Payment successful! Your appointment has been confirmed.')
       } catch (updateError) {
         console.error('Error updating appointment status:', updateError)
         // Still show success message even if update fails
-        alert('Payment successful! Your appointment is being processed and will be confirmed shortly.')
+        showSuccessToast('✅ Payment successful! Your appointment is being processed and will be confirmed shortly.')
       }
     } else {
       // Show generic success message
-      alert('Payment successful! Your appointment is being processed.')
+      showSuccessToast('✅ Payment successful! Your appointment is being processed.')
     }
   } catch (error) {
     console.error('Error checking appointment status:', error)
-    // Show success message even if there's an error checking status
-    alert('Payment successful! Your appointment is being processed.')
+    // Show error toast for payment processing issues
+    showErrorToast('⚠️ Payment completed but there was an issue updating your appointment. Please contact support if you don\'t see your appointment confirmed within a few minutes.')
   }
   
   // Clean up URL parameters
@@ -175,25 +592,43 @@ const loadAppointments = async () => {
   error.value = ''
   
   try {
-    const response = await appointmentApi.getCustomerAppointments()
+    // Get current customer ID from localStorage
+    const customerUser = JSON.parse(localStorage.getItem('customer_user') || '{}')
+    const customerId = customerUser.customerID || customerUser.id
+    
+    
+    if (!customerId) {
+      throw new Error('Customer ID not found. Please log in again.')
+    }
+    
+    const customerData = await customerApi.getCustomerWithAppointments(customerId)
+    
+    // Get appointments for the current customer
+    const customerAppointments = customerData.appointments || []
     
     // Transform API response to match our component structure
-    appointments.value = response.map(appointment => ({
-      id: appointment.appointmentID,
-      serviceName: appointment.service_rate?.service_type?.serviceTypeName || 'Unknown Service',
-      price: parseFloat(appointment.service_rate?.price || 0),
-      appointmentDate: appointment.appointmentDateTime?.split(' ')[0] || '',
-      appointmentTime: formatTime(appointment.appointmentDateTime?.split(' ')[1] || ''),
-      vehicleType: appointment.service_rate?.vehicle_size?.vehicleSizeDescription || 'Unknown Vehicle',
-      instructions: appointment.instructions || '',
-      status: appointment.status || 'pending'
-    }))
+    appointments.value = customerAppointments.map(appointment => {
+      
+      const transformedAppointment = {
+        id: appointment.id,
+        service_rate_id: appointment.service_rate_id,
+        serviceName: appointment.service_rate?.service_type?.serviceTypeName || 'Unknown Service',
+        price: parseFloat(appointment.service_rate?.price || 0),
+        appointmentDate: appointment.datetime?.split(' ')[0] || '',
+        appointmentTime: formatTime(appointment.datetime?.split(' ')[1] || ''),
+        vehicleType: appointment.service_rate?.vehicle_size?.vehicleSizeDescription || 'Vehicle size not specified',
+        instructions: appointment.instructions || '',
+        status: appointment.status?.toLowerCase() || 'pending',
+        service_rate: appointment.service_rate
+      }
+      
+      return transformedAppointment
+    })
+    
     
   } catch (err) {
     console.error('Error loading appointments:', err)
     error.value = 'Failed to load appointments. Please try again.'
-    
-    // Fallback to empty array if API fails
     appointments.value = []
   } finally {
     loading.value = false
@@ -234,51 +669,340 @@ const formatDate = (dateString) => {
 }
 
 const cancelAppointment = (appointmentId) => {
+  const appointment = appointments.value.find(app => app.id === appointmentId)
+  
+  if (!appointment) {
+    alert('Appointment not found')
+    return
+  }
+  
+  if (!canCancelAppointment(appointment)) {
+    alert('This appointment cannot be cancelled')
+    return
+  }
+  
   if (confirm('Are you sure you want to cancel this appointment?')) {
     // In real app, make API call to cancel appointment
-    const appointment = appointments.value.find(app => app.id === appointmentId)
-    if (appointment) {
-      appointment.status = 'cancelled'
-    }
+    appointment.status = 'cancelled'
     alert('Appointment cancelled successfully')
   }
 }
 
+const rescheduleAppointment = (appointment) => {
+  if (!canModifyAppointment(appointment)) {
+    alert('This appointment cannot be rescheduled')
+    return
+  }
+  
+  // Navigate to booking page with pre-filled service for rescheduling
+  router.push({
+    path: '/customer/book',
+    query: { 
+      service: appointment.serviceName,
+      reschedule: appointment.id,
+      currentDate: appointment.appointmentDate,
+      currentTime: appointment.appointmentTime
+    }
+  })
+}
+
 const bookAgain = (appointment) => {
+  // Close modal if it's open
+  closeDetailsModal()
+  
   // Navigate to booking page with pre-filled service
   router.push({
     path: '/customer/book',
     query: { service: appointment.serviceName }
   })
 }
-
-const viewDetails = (appointment) => {
-  // In real app, this might open a modal or navigate to details page
-  alert(`Appointment Details:\n\nService: ${appointment.serviceName}\nDate: ${formatDate(appointment.appointmentDate)}\nTime: ${appointment.appointmentTime}\nVehicle: ${appointment.vehicleType}\nStatus: ${appointment.status}`)
-}
 </script>
 
 <style scoped>
+/* Base styles for the appointments page */
 .customer-appointments {
-  max-width: 1200px;
-  margin: 0 auto;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+  min-height: 100vh;
+  padding: 2rem 1rem;
 }
 
-.appointments-header {
-  text-align: center;
-  margin-bottom: 40px;
+/* Professional Overview Section Styles */
+.appointments-overview {
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 24px;
+  padding: 0;
+  margin: 2rem auto 3rem;
+  max-width: 2000px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  overflow: hidden;
 }
 
-.appointments-header h1 {
+.professional-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 3rem 2.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.professional-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><circle cx="200" cy="200" r="100" fill="rgba(255,255,255,0.1)"/><circle cx="800" cy="300" r="150" fill="rgba(255,255,255,0.05)"/><circle cx="600" cy="700" r="120" fill="rgba(255,255,255,0.08)"/></svg>');
+  opacity: 0.3;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.filter-group label {
+  font-weight: 600;
+  color: #374151;
+  min-width: 100px;
+  font-size: 14px;
+}
+
+.filter-group select {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: white;
+  color: #374151;
+  font-size: 14px;
+  min-width: 150px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-group select:hover {
+  border-color: #9ca3af;
+}
+
+.filter-group select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Container for filter groups */
+.filters-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.header-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title-section h1 {
+  font-size: 3.5rem;
+  font-weight: 900;
+  color: white;
+  margin: 0 0 0.75rem 0;
+  text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  letter-spacing: -0.02em;
+}
+
+.title-section p {
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 1.3rem;
+  font-weight: 400;
+  margin: 0;
+  opacity: 0.9;
+}
+
+.overview-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+  margin: 2.5rem 0;
+  padding: 0 2.5rem;
+}
+
+.overview-card {
+  background: white;
+  border-radius: 16px;
+  padding: 0;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  position: relative;
+}
+
+.overview-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #e5e7eb, #e5e7eb);
+  transition: all 0.3s ease;
+}
+
+.overview-card.upcoming::before {
+  background: linear-gradient(90deg, #3b82f6, #1e40af);
+}
+
+.overview-card.total::before {
+  background: linear-gradient(90deg, #0ea5e9, #0284c7);
+}
+
+.overview-card.completed::before {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.overview-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 1.5rem 0;
+}
+
+.card-icon {
   font-size: 2.5rem;
-  font-weight: 700;
-  color: #1f2937;
-  margin-bottom: 8px;
+  filter: grayscale(0.2);
+  transition: all 0.3s ease;
 }
 
-.appointments-header p {
+.overview-card:hover .card-icon {
+  transform: scale(1.1);
+  filter: grayscale(0);
+}
+
+.card-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.upcoming .card-badge {
+  background: rgba(59, 130, 246, 0.1);
+  color: #1e40af;
+}
+
+.total .card-badge {
+  background: rgba(14, 165, 233, 0.1);
+  color: #0284c7;
+}
+
+.completed .card-badge {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+
+.card-content {
+  padding: 0 1.5rem 1.5rem;
+}
+
+.card-content h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
   color: #6b7280;
+  margin: 0.5rem 0 0.25rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.card-number {
+  font-size: 3rem;
+  font-weight: 900;
+  color: #1f2937;
+  display: block;
+  margin: 0.5rem 0;
+  line-height: 1;
+  background: linear-gradient(135deg, #1f2937, #4b5563);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.card-content p {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin: 0.75rem 0 0 0;
+  font-weight: 500;
+}
+
+.view-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  background: #f8fafc;
+  border-radius: 16px;
+  padding: 0.75rem;
+  max-width: 400px;
+  margin: 0 auto 2.5rem;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+.toggle-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  border: none;
+  background: transparent;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 12px;
+  position: relative;
+}
+
+.toggle-btn.active {
+  background: white;
+  color: #4f46e5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.toggle-btn:hover:not(.active) {
+  color: #475569;
+  background: rgba(255, 255, 255, 0.7);
+  transform: translateY(-1px);
+}
+
+.btn-icon {
   font-size: 1.1rem;
+  transition: transform 0.3s ease;
+}
+
+.toggle-btn.active .btn-icon {
+  transform: scale(1.1);
 }
 
 .appointments-container {
@@ -352,6 +1076,15 @@ const viewDetails = (appointment) => {
 
 .appointment-card.cancelled {
   border-left: 4px solid #ef4444;
+}
+
+.appointment-card.past-appointment {
+  opacity: 0.7;
+  background: #f9fafb;
+}
+
+.appointment-card.past-appointment .appointment-header h3 {
+  color: #6b7280;
 }
 
 .appointment-header {
@@ -465,6 +1198,89 @@ const viewDetails = (appointment) => {
   background: #e5e7eb;
 }
 
+.reschedule-btn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.reschedule-btn:hover {
+  background: #fde68a;
+}
+
+.action-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f3f4f6 !important;
+  color: #9ca3af !important;
+}
+
+.action-btn.disabled:hover {
+  background: #f3f4f6 !important;
+  color: #9ca3af !important;
+}
+
+.loading-state {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;
+  border-top: 4px solid #2563eb;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-state p {
+  color: #6b7280;
+  font-size: 1.1rem;
+}
+
+.error-state {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.error-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+}
+
+.error-state h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #dc2626;
+  margin-bottom: 10px;
+}
+
+.error-state p {
+  color: #6b7280;
+  margin-bottom: 30px;
+}
+
+.retry-btn {
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.retry-btn:hover {
+  background: #b91c1c;
+}
+
 .empty-state {
   text-align: center;
   padding: 60px 20px;
@@ -501,8 +1317,398 @@ const viewDetails = (appointment) => {
   background: #1d4ed8;
 }
 
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2rem 2rem 0 2rem;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 1.5rem;
+}
+
+.modal-header h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.close-btn:hover {
+  background: #f3f4f6;
+  color: #6b7280;
+  transform: rotate(90deg);
+}
+
+.modal-body {
+  padding: 0 2rem;
+}
+
+.detail-card {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid #e2e8f0;
+}
+
+.appointment-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.appointment-number {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.number-label {
+  font-size: 0.875rem;
+  color: #64748b;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.number-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #1e293b;
+  background: linear-gradient(135deg, #1e293b, #475569);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.status-badge {
+  padding: 0.75rem 1.25rem;
+  border-radius: 25px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.status-badge.completed {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.status-badge.pending {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+}
+
+.status-badge.confirmed {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+}
+
+.status-badge.cancelled {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.25rem;
+}
+
+.detail-item {
+  background: white;
+  border-radius: 10px;
+  padding: 1.25rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f1f5f9;
+  transition: all 0.3s ease;
+}
+
+.detail-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.detail-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.detail-icon {
+  font-size: 1.5rem;
+  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 2px solid #e2e8f0;
+}
+
+.detail-content {
+  flex: 1;
+}
+
+.detail-content h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #64748b;
+  margin: 0 0 0.5rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-content p {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.detail-content p.price {
+  font-size: 1.25rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #059669, #10b981);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.modal-footer {
+  padding: 1.5rem 2rem 2rem;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+
+.modal-btn {
+  padding: 0.875rem 1.75rem;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.925rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: white;
+  box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
+}
+
+.primary-btn:hover {
+  background: linear-gradient(135deg, #4338ca, #6d28d9);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(79, 70, 229, 0.4);
+}
+
+.secondary-btn {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.secondary-btn:hover {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+/* Toast Notification Styles */
+.toast-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  max-width: 400px;
+  padding: 16px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  animation: slideInRight 0.3s ease;
+}
+
+.toast-notification.success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border-left: 4px solid #065f46;
+}
+
+.toast-notification.error {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border-left: 4px solid #991b1b;
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.toast-message {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.toast-close:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
+  .professional-header {
+    padding: 2rem 1.5rem;
+  }
+  
+  .header-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 1.5rem;
+  }
+  
+  .title-section h1 {
+    font-size: 2.5rem;
+  }
+  
+  .title-section p {
+    font-size: 1.1rem;
+  }
+  
+  .overview-cards {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    padding: 0 1.5rem;
+    margin: 2rem 0;
+  }
+  
+  .card-number {
+    font-size: 2.5rem;
+  }
+  
+  .card-icon {
+    font-size: 2rem;
+  }
+  
+  .view-toggle {
+    max-width: 320px;
+    margin: 0 auto 2rem;
+  }
+  
+  .toggle-btn {
+    padding: 0.875rem 1rem;
+    font-size: 0.9rem;
+  }
+  
   .appointments-container {
     padding: 20px;
   }
@@ -522,18 +1728,105 @@ const viewDetails = (appointment) => {
     justify-content: center;
   }
   
-  .appointments-header h1 {
-    font-size: 2rem;
+  .modal-content {
+    width: 95%;
+    margin: 1rem;
+  }
+  
+  .modal-header {
+    padding: 1.5rem 1.5rem 0 1.5rem;
+  }
+  
+  .modal-body {
+    padding: 0 1.5rem;
+  }
+  
+  .modal-footer {
+    padding: 1.5rem 1.5rem 2rem;
+    flex-direction: column;
+  }
+  
+  .modal-btn {
+    width: 100%;
+  }
+  
+  .details-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .appointment-info {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    text-align: center;
+  }
+    .toast-notification {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
   }
 }
 
 @media (max-width: 480px) {
+  .professional-header {
+    padding: 1.5rem 1rem;
+  }
+  
+  .title-section h1 {
+    font-size: 2rem;
+  }
+  
+  .overview-cards {
+    padding: 0 1rem;
+  }
+  
+  .card-header {
+    padding: 1rem 1rem 0;
+  }
+  
+  .card-content {
+    padding: 0 1rem 1rem;
+  }
+  
+  .view-toggle {
+    max-width: 280px;
+    padding: 0.5rem;
+  }
+  
+  .toggle-btn {
+    padding: 0.75rem 0.75rem;
+    font-size: 0.85rem;
+  }
+  
+  .btn-icon {
+    font-size: 1rem;
+  }
+  
   .appointment-actions {
     flex-direction: column;
   }
   
   .action-btn {
     width: 100%;
+  }
+  
+  .modal-header h2 {
+    font-size: 1.5rem;
+  }
+  
+  .number-value {
+    font-size: 1.5rem;
+  }
+  
+  .detail-item {
+    padding: 1rem;
+  }
+  
+  .detail-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
   }
 }
 </style>
