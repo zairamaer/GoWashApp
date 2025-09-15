@@ -37,11 +37,10 @@ api.interceptors.request.use(
 // Response interceptor - FIXED VERSION
 api.interceptors.response.use(
   (response) => {
-    console.log('API Response:', response.config.url, response.status, response.data)
+
     return response
   },
   (error) => {
-    console.error('API Error:', error.config?.url, error.response?.status, error.response?.data)
     
     if (error.response?.status === 401) {
       // Check if this is a login attempt (don't redirect on login failures)
@@ -222,11 +221,34 @@ export const serviceApi = {
 
   async updateServiceType(id, serviceTypeData) {
     try {
-      console.log('Updating service type with direct service-types endpoint:', { id, serviceTypeData })
+      console.log('=== UPDATE SERVICE TYPE START ===')
+      console.log('ID:', id)
+      console.log('Service Type Data:', serviceTypeData)
+      console.log('Has image file:', !!serviceTypeData.imageFile)
       
       // If there's an image file, use FormData
       if (serviceTypeData.imageFile) {
-        console.log('Updating with image file using FormData')
+        console.log('=== UPDATING WITH IMAGE FILE ===')
+        
+        // Validate file before sending
+        const file = serviceTypeData.imageFile
+        console.log('File details:', {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          lastModified: file.lastModified
+        })
+        
+        // Check file size (2MB limit)
+        if (file.size > 2048 * 1024) {
+          throw new Error('Image file is too large. Maximum size is 2MB.')
+        }
+        
+        // Check file type
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/svg+xml']
+        if (!allowedTypes.includes(file.type)) {
+          throw new Error('Invalid file type. Please upload JPEG, PNG, JPG, GIF, or SVG images only.')
+        }
         
         const formData = new FormData()
         formData.append('serviceTypeName', serviceTypeData.serviceTypeName)
@@ -234,58 +256,117 @@ export const serviceApi = {
         formData.append('serviceTypeImage', serviceTypeData.imageFile)
         formData.append('_method', 'PUT')
         
-        console.log('FormData contents for update with image:', {
-          serviceTypeName: serviceTypeData.serviceTypeName,
-          serviceTypeDescription: serviceTypeData.serviceTypeDescription,
-          hasImageFile: true,
-          imageFileName: serviceTypeData.imageFile.name
-        })
-        
-        // Try POST with method spoofing first (common for file uploads in Laravel)
-        let response
-        try {
-          response = await api.post(`/service-types/${id}`, formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data'
-            }
-          })
-          console.log('Update with image successful using POST method spoofing')
-        } catch (postError) {
-          console.log('POST method failed, trying PUT method:', postError.message)
-          response = await api.put(`/service-types/${id}`, formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data'
-            }
-          })
-          console.log('Update with image successful using PUT method')
+        // Debug: Log all FormData entries
+        console.log('=== FORM DATA CONTENTS ===')
+        for (let [key, value] of formData.entries()) {
+          if (value instanceof File) {
+            console.log(`${key}:`, { name: value.name, size: value.size, type: value.type })
+          } else {
+            console.log(`${key}:`, value)
+          }
         }
         
-        console.log('Service type updated successfully with image:', response.data)
+        console.log(`Making POST request to: /service-types/${id}`)
+        
+        const response = await api.post(`/service-types/${id}`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          },
+          timeout: 30000,
+          validateStatus: function (status) {
+            // Don't throw error for any status code so we can debug
+            return status < 500; // Only throw for 5xx server errors
+          }
+        })
+        
+        console.log('=== RESPONSE RECEIVED ===')
+        console.log('Status:', response.status)
+        console.log('Status Text:', response.statusText)
+        console.log('Response Data:', response.data)
+        console.log('Response Headers:', response.headers)
+        
+        if (response.status === 422) {
+          console.log('=== VALIDATION ERRORS ===')
+          console.log('Errors object:', response.data.errors)
+          const errors = response.data.errors || {}
+          const errorMessages = Object.entries(errors).map(([field, messages]) => 
+            `${field}: ${messages.join(', ')}`
+          ).join('; ')
+          throw new Error(`Validation failed: ${errorMessages || response.data.message || 'Unknown validation error'}`)
+        }
+        
+        if (response.status !== 200 && response.status !== 201) {
+          throw new Error(`Server responded with status ${response.status}: ${response.data.message || response.statusText}`)
+        }
+        
+        console.log('✅ Update with image successful')
         return response.data
+        
       } else {
-        // No image file, use regular JSON request
-        console.log('Updating without image file using JSON')
+        console.log('=== UPDATING WITHOUT IMAGE FILE ===')
         
         const updateData = {
           serviceTypeName: serviceTypeData.serviceTypeName,
           serviceTypeDescription: serviceTypeData.serviceTypeDescription || ''
         }
         
-        console.log('JSON data for update without image:', updateData)
+        console.log('JSON data for update:', updateData)
+        console.log(`Making PUT request to: /service-types/${id}`)
         
-        const response = await api.put(`/service-types/${id}`, updateData)
-        console.log('Service type updated successfully without image:', response.data)
+        const response = await api.put(`/service-types/${id}`, updateData, {
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000,
+          validateStatus: function (status) {
+            return status < 500;
+          }
+        })
+        
+        console.log('=== RESPONSE RECEIVED (JSON) ===')
+        console.log('Status:', response.status)
+        console.log('Response Data:', response.data)
+        
+        if (response.status === 422) {
+          const errors = response.data.errors || {}
+          const errorMessages = Object.entries(errors).map(([field, messages]) => 
+            `${field}: ${messages.join(', ')}`
+          ).join('; ')
+          throw new Error(`Validation failed: ${errorMessages || response.data.message || 'Unknown validation error'}`)
+        }
+        
+        if (response.status !== 200) {
+          throw new Error(`Server responded with status ${response.status}: ${response.data.message || response.statusText}`)
+        }
+        
+        console.log('✅ Update without image successful')
         return response.data
       }
     } catch (error) {
-      console.error('Error updating service type:', error)
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        hasImageFile: !!serviceTypeData.imageFile
-      })
-      throw error
+      console.log('=== ERROR CAUGHT ===')
+      console.log('Error object:', error)
+      console.log('Error message:', error.message)
+      console.log('Error code:', error.code)
+      console.log('Error response:', error.response)
+      console.log('Error config:', error.config)
+      
+      // If it's our custom error, re-throw it
+      if (error.message.includes('Validation failed') || 
+          error.message.includes('too large') || 
+          error.message.includes('Invalid file type') ||
+          error.message.includes('Server responded with status')) {
+        throw error
+      }
+      
+      // Handle network errors
+      if (error.code === 'ECONNABORTED') {
+        throw new Error('Request timeout - file might be too large or connection is slow')
+      } else if (error.message === 'Network Error') {
+        throw new Error('Network connection failed - check your internet connection and server status')
+      }
+      
+      // For any other error, provide full details
+      throw new Error(`Update failed: ${error.message} (Code: ${error.code || 'unknown'})`)
     }
   },
 
@@ -363,7 +444,6 @@ export const customerApi = {
     // First try the individual customer endpoint
     try {
       const response = await api.get(`/customers/${customerId}`)
-      console.log('Individual customer API response:', response.data)
       // Handle the data wrapper if it exists
       return response.data.data || response.data
     } catch (error) {

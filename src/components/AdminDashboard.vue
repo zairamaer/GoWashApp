@@ -19,7 +19,7 @@
         </div>
         <div class="stat-content">
           <h3>Total Appointments</h3>
-          <p class="stat-number">{{ appointments.length }}</p>
+          <p class="stat-number">{{ confirmedAppointments.length }}</p>
           <span class="stat-change positive">+12% from last week</span>
         </div>
       </div>
@@ -173,6 +173,12 @@ const getServiceName = (serviceTypeID) => {
   const serviceType = serviceTypes.value.find(type => type.serviceTypeID === serviceTypeID)
   return serviceType?.serviceTypeName || 'Unknown Service'
 }
+
+// Computed
+
+const confirmedAppointments = computed(() => {
+  return appointments.value.filter(apt => apt.status === 'confirmed')
+})
 
 // Using imported getImageUrl utility function
 

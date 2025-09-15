@@ -69,10 +69,10 @@
               <div class="service-pricing">
                 <div class="price-range">
                   <span class="price-from">Starting from</span>
-                  <span class="price-amount">${{ service.minPrice }}</span>
+                  <span class="price-amount">₱{{ service.minPrice }}</span>
                 </div>
                 <div v-if="service.maxPrice > service.minPrice" class="price-range-text">
-                  Up to ${{ service.maxPrice }} for larger vehicles
+                  Up to ₱{{ service.maxPrice }} for larger vehicles
                 </div>
               </div>
             </div>
@@ -152,7 +152,6 @@ const loadServices = async () => {
     serviceTypes.value = serviceTypesResponse
     serviceRates.value = serviceRatesResponse
     
-    console.log('Services loaded:', displayServices.value)
   } catch (err) {
     console.error('Error loading services:', err)
     error.value = 'Failed to load services. Please try again.'

@@ -62,24 +62,23 @@
 
         <div class="appointments-container">
             <div class="appointments-filters">
-                <div class="filter-group">
-                    <label>Filter by Status:</label>
-                    <select v-model="statusFilter" @change="filterAppointments">
-                        <option value="">All</option>
-                        <option v-if="activeView === 'schedules'" value="confirmed">Confirmed</option>
-                        <option v-if="activeView === 'schedules'" value="pending">Pending</option>
-                        <option v-if="activeView === 'history'" value="completed">Completed</option>
-                        <option v-if="activeView === 'history'" value="cancelled">Cancelled</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>Sort by:</label>
-                    <select v-model="sortBy" @change="sortAppointments">
-                        <option value="date">Date</option>
-                        <option value="service">Service</option>
-                        <option value="status">Status</option>
-                    </select>
-                </div>
+              <div v-if="activeView === 'history'" class="filter-group">
+                  <label>Filter by Status:</label>
+                  <select v-model="statusFilter" @change="filterAppointments">
+                      <option value="">All</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                  </select>
+              </div>
+              <div v-if="activeView === 'schedules'" class="filter-group">
+                  <label>Sort by:</label>
+                  <select v-model="sortBy" @change="sortAppointments">
+                      <option value="all">All</option>
+                      <option value="today">Today</option>
+                      <option value="week">This Week</option>
+                      <option value="month">This Month</option>
+                  </select>
+              </div>
             </div>
 
             <div v-if="loading" class="loading-state">
@@ -99,7 +98,7 @@
                      class="appointment-card" :class="[appointment.status]">
                     <div class="appointment-header">
                         <div class="appointment-id">
-                            <h3>Appointment #{{ appointment.id }}</h3>
+                            <h3>Appointment #{{ getAppointmentNumber(appointment) }}</h3>
                         </div>
                         <div class="appointment-status" :class="appointment.status">
                             {{ appointment.status.replace('-', ' ').toUpperCase() }}
@@ -125,7 +124,7 @@
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">💰 Price:</span>
-                            <span class="detail-value">${{ appointment.price || '0.00' }}</span>
+                            <span class="detail-value">₱{{ appointment.price || '0.00' }}</span>
                         </div>
                         <div v-if="appointment.instructions" class="detail-row">
                             <span class="detail-label">📝 Instructions:</span>
@@ -167,7 +166,7 @@
                         <div class="appointment-info">
                             <div class="appointment-number">
                                 <span class="number-label">Appointment #</span>
-                                <span class="number-value">{{ selectedAppointment.id }}</span>
+                                <span class="number-value">{{ getAppointmentNumber(selectedAppointment) }}</span>
                             </div>
                             <div class="status-badge" :class="selectedAppointment.status">
                                 {{ selectedAppointment.status.replace('-', ' ').toUpperCase() }}
@@ -211,7 +210,7 @@
                                 <div class="detail-icon">💰</div>
                                 <div class="detail-content">
                                     <h4>Price</h4>
-                                    <p class="price">${{ selectedAppointment.price || '0.00' }}</p>
+                                    <p class="price">₱{{ selectedAppointment.price || '0.00' }}</p>
                                 </div>
                             </div>
                             
@@ -238,6 +237,14 @@
                 </div>
             </div>
         </div>
+
+        <!-- Toast Notification -->
+        <div v-if="showToast" class="toast-notification" :class="toastType" @click="hideToast">
+            <div class="toast-content">
+                <span class="toast-message">{{ toastMessage }}</span>
+                <button class="toast-close" @click="hideToast">&times;</button>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -250,7 +257,7 @@ const router = useRouter()
 const route = useRoute()
 
 const statusFilter = ref('')
-const sortBy = ref('date')
+const sortBy = ref('all')
 const appointments = ref([])
 const loading = ref(false)
 const error = ref('')
@@ -260,16 +267,89 @@ const activeView = ref('schedules') // 'schedules' or 'history'
 const showDetailsModal = ref(false)
 const selectedAppointment = ref(null)
 
+// Toast notification state
+const showToast = ref(false)
+const toastMessage = ref('')
+const toastType = ref('success') // 'success' or 'error'
+
+// Toast functions
+const showSuccessToast = (message) => {
+  toastMessage.value = message
+  toastType.value = 'success'
+  showToast.value = true
+  setTimeout(() => {
+    showToast.value = false
+  }, 5000) // Hide after 5 seconds
+}
+
+const showErrorToast = (message) => {
+  toastMessage.value = message
+  toastType.value = 'error'
+  showToast.value = true
+  setTimeout(() => {
+    showToast.value = false
+  }, 5000) // Hide after 5 seconds
+}
+
+const hideToast = () => {
+  showToast.value = false
+}
+
+// Helper function to convert 12-hour time to 24-hour for proper date comparison
+const convertTo24Hour = (timeString) => {
+  if (!timeString) return '00:00:00'
+  
+  try {
+    // If already in 24-hour format, return as is
+    if (!timeString.includes('AM') && !timeString.includes('PM')) {
+      return timeString.includes(':') ? timeString : '00:00:00'
+    }
+    
+    // Convert from 12-hour to 24-hour format
+    const [time, period] = timeString.split(' ')
+    let [hours, minutes] = time.split(':')
+    hours = parseInt(hours, 10)
+    
+    if (period === 'AM' && hours === 12) {
+      hours = 0
+    } else if (period === 'PM' && hours !== 12) {
+      hours += 12
+    }
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes}:00`
+  } catch (error) {
+    console.error('Error converting time:', error)
+    return '00:00:00'
+  }
+}
+
+// Improved helper function to check if appointment is in the past
+const isAppointmentInPast = (appointment) => {
+  try {
+    const appointmentDateTime = new Date(`${appointment.appointmentDate} ${convertTo24Hour(appointment.appointmentTime)}`)
+    const now = new Date()
+    
+    // Add a small buffer (5 minutes) to avoid showing appointments that just started
+    const bufferTime = 5 * 60 * 1000 // 5 minutes in milliseconds
+    return (appointmentDateTime.getTime() + bufferTime) < now.getTime()
+  } catch (error) {
+    console.error('Error checking if appointment is in past:', error)
+    return false
+  }
+}
+
 // Computed properties for overview cards
 const upcomingCount = computed(() => {
   return appointments.value.filter(app => 
-    (app.status === 'confirmed' || app.status === 'pending') && 
+    app.status === 'confirmed' && // Only confirmed appointments
     !isAppointmentInPast(app)
   ).length
 })
 
 const totalCount = computed(() => {
-  return appointments.value.length
+  return appointments.value.filter(app => 
+    app.status === 'confirmed'
+  ).length
 })
 
 const completedCount = computed(() => {
@@ -279,10 +359,14 @@ const completedCount = computed(() => {
 const nextAppointmentText = computed(() => {
   const upcomingAppointments = appointments.value
     .filter(app => 
-      (app.status === 'confirmed' || app.status === 'pending') && 
+      app.status === 'confirmed' && // Only confirmed appointments
       !isAppointmentInPast(app)
     )
-    .sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate))
+    .sort((a, b) => {
+      const aDateTime = new Date(`${a.appointmentDate} ${convertTo24Hour(a.appointmentTime)}`)
+      const bDateTime = new Date(`${b.appointmentDate} ${convertTo24Hour(b.appointmentTime)}`)
+      return aDateTime - bDateTime // Nearest first
+    })
   
   if (upcomingAppointments.length > 0) {
     const next = upcomingAppointments[0]
@@ -291,9 +375,14 @@ const nextAppointmentText = computed(() => {
     const tomorrow = new Date(today)
     tomorrow.setDate(today.getDate() + 1)
     
-    if (appointmentDate.toDateString() === today.toDateString()) {
+    // Reset time to start of day for comparison
+    today.setHours(0, 0, 0, 0)
+    tomorrow.setHours(0, 0, 0, 0)
+    appointmentDate.setHours(0, 0, 0, 0)
+    
+    if (appointmentDate.getTime() === today.getTime()) {
       return `Next: Today ${next.appointmentTime}`
-    } else if (appointmentDate.toDateString() === tomorrow.toDateString()) {
+    } else if (appointmentDate.getTime() === tomorrow.getTime()) {
       return `Next: Tomorrow ${next.appointmentTime}`
     } else {
       return `Next: ${formatDate(next.appointmentDate)} ${next.appointmentTime}`
@@ -302,62 +391,110 @@ const nextAppointmentText = computed(() => {
   return 'No upcoming appointments'
 })
 
+// Add this computed property to generate appointment numbers
+const getAppointmentNumber = (appointment) => {
+  // Get all confirmed appointments for this customer, sorted by creation date
+  const confirmedAppointments = appointments.value
+    .filter(app => app.status === 'confirmed' || app.status === 'completed')
+    .sort((a, b) => {
+      // Sort by appointment date/time to maintain consistent ordering
+      const aDateTime = new Date(`${a.appointmentDate} ${convertTo24Hour(a.appointmentTime)}`)
+      const bDateTime = new Date(`${b.appointmentDate} ${convertTo24Hour(b.appointmentTime)}`)
+      return aDateTime - bDateTime
+    })
+  
+  // Find the index of this appointment and add 1 for human-readable numbering
+  const appointmentIndex = confirmedAppointments.findIndex(app => app.id === appointment.id)
+  return appointmentIndex !== -1 ? appointmentIndex + 1 : 0
+}
+
+// Helper functions for date filtering
+const isToday = (date) => {
+  const today = new Date()
+  const checkDate = new Date(date)
+  today.setHours(0, 0, 0, 0)
+  checkDate.setHours(0, 0, 0, 0)
+  return checkDate.getTime() === today.getTime()
+}
+
+const isThisWeek = (date) => {
+  const today = new Date()
+  const checkDate = new Date(date)
+  const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay()))
+  const endOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 6))
+  startOfWeek.setHours(0, 0, 0, 0)
+  endOfWeek.setHours(23, 59, 59, 999)
+  return checkDate >= startOfWeek && checkDate <= endOfWeek
+}
+
+const isThisMonth = (date) => {
+  const today = new Date()
+  const checkDate = new Date(date)
+  return checkDate.getMonth() === today.getMonth() && 
+         checkDate.getFullYear() === today.getFullYear()
+}
+
 // Filter appointments based on active view and status filter
 const filteredAppointments = computed(() => {
   let filtered = [...appointments.value]
   
-  console.log('All appointments:', appointments.value)
   
   // First filter by active view (schedules vs history)
   if (activeView.value === 'schedules') {
-    // Schedules: confirmed and pending appointments
+    // Schedules: ONLY confirmed appointments that are NOT in the past (exclude pending)
     filtered = filtered.filter(app => 
-      app.status === 'confirmed' || app.status === 'pending'
+      app.status === 'confirmed' && // Only confirmed appointments
+      !isAppointmentInPast(app)
     )
+    
+    // Apply date range filter for schedules
+    if (sortBy.value === 'today') {
+      filtered = filtered.filter(app => isToday(app.appointmentDate))
+    } else if (sortBy.value === 'week') {
+      filtered = filtered.filter(app => isThisWeek(app.appointmentDate))
+    } else if (sortBy.value === 'month') {
+      filtered = filtered.filter(app => isThisMonth(app.appointmentDate))
+    }
+    // 'all' doesn't need additional filtering
+    
+    // Sort schedules by nearest date/time first (ascending order)
+    filtered.sort((a, b) => {
+      const aDateTime = new Date(`${a.appointmentDate} ${convertTo24Hour(a.appointmentTime)}`)
+      const bDateTime = new Date(`${b.appointmentDate} ${convertTo24Hour(b.appointmentTime)}`)
+      return aDateTime - bDateTime // Nearest first
+    })
+    
   } else if (activeView.value === 'history') {
     // History: completed and cancelled appointments
     filtered = filtered.filter(app => 
       app.status === 'completed' || app.status === 'cancelled'
     )
+    
+    // Sort history by most recent first (descending order)
+    filtered.sort((a, b) => {
+      const aDateTime = new Date(`${a.appointmentDate} ${convertTo24Hour(b.appointmentTime)}`)
+      const bDateTime = new Date(`${b.appointmentDate} ${convertTo24Hour(b.appointmentTime)}`)
+      return bDateTime - aDateTime // Most recent first
+    })
   }
   
-  console.log(`After ${activeView.value} filter:`, filtered)
   
   // Then filter by specific status if selected
   if (statusFilter.value) {
     filtered = filtered.filter(app => app.status === statusFilter.value)
-    console.log('After status filter:', filtered)
   }
   
-  // Sort appointments
-  filtered.sort((a, b) => {
-    switch (sortBy.value) {
-      case 'date':
-        return new Date(a.appointmentDate) - new Date(b.appointmentDate)
-      case 'service':
-        return (a.serviceName || '').localeCompare(b.serviceName || '')
-      case 'status':
-        return a.status.localeCompare(b.status)
-      default:
-        return 0
-    }
-  })
-  
-  console.log('Final filtered appointments:', filtered)
   return filtered
 })
 
-// Watch for active view changes and reset status filter
-watch(activeView, () => {
-  statusFilter.value = ''
+// Initialize sortBy based on active view
+watch(activeView, (newView) => {
+  if (newView === 'schedules') {
+    sortBy.value = 'all' // Default to all for schedules
+  } else {
+    sortBy.value = '' // Default to all for history
+  }
 })
-
-// Helper function to check if appointment is in the past
-const isAppointmentInPast = (appointment) => {
-  const appointmentDateTime = new Date(`${appointment.appointmentDate} ${appointment.appointmentTime}`)
-  const now = new Date()
-  return appointmentDateTime < now
-}
 
 // Helper function to check if appointment can be cancelled
 const canCancelAppointment = (appointment) => {
@@ -417,7 +554,6 @@ const handlePaymentSuccess = async (appointmentId) => {
       const payment = await paymentApi.getPaymentByAppointment(appointmentId)
       if (payment) {
         await paymentApi.markPaymentAsPaid(payment.paymentID)
-        console.log('Payment status updated to paid')
       }
     } catch (paymentError) {
       console.error('Error updating payment status:', paymentError)
@@ -425,26 +561,26 @@ const handlePaymentSuccess = async (appointmentId) => {
     
     if (appointment && appointment.status === 'confirmed') {
       // Already confirmed by webhook
-      alert('Payment successful! Your appointment has been confirmed.')
+      showSuccessToast('🎉 Payment successful! Your appointment has been confirmed.')
     } else if (appointment && appointment.status === 'pending') {
       // Webhook might not have processed yet, try to manually confirm
       try {
         // Update appointment status to confirmed
         await appointmentApi.updateAppointment(appointmentId, { status: 'confirmed' })
-        alert('Payment successful! Your appointment has been confirmed.')
+        showSuccessToast('🎉 Payment successful! Your appointment has been confirmed.')
       } catch (updateError) {
         console.error('Error updating appointment status:', updateError)
         // Still show success message even if update fails
-        alert('Payment successful! Your appointment is being processed and will be confirmed shortly.')
+        showSuccessToast('✅ Payment successful! Your appointment is being processed and will be confirmed shortly.')
       }
     } else {
       // Show generic success message
-      alert('Payment successful! Your appointment is being processed.')
+      showSuccessToast('✅ Payment successful! Your appointment is being processed.')
     }
   } catch (error) {
     console.error('Error checking appointment status:', error)
-    // Show success message even if there's an error checking status
-    alert('Payment successful! Your appointment is being processed.')
+    // Show error toast for payment processing issues
+    showErrorToast('⚠️ Payment completed but there was an issue updating your appointment. Please contact support if you don\'t see your appointment confirmed within a few minutes.')
   }
   
   // Clean up URL parameters
@@ -460,25 +596,18 @@ const loadAppointments = async () => {
     const customerUser = JSON.parse(localStorage.getItem('customer_user') || '{}')
     const customerId = customerUser.customerID || customerUser.id
     
-    console.log('Customer ID from localStorage:', customerId)
-    console.log('Customer user data:', customerUser)
     
     if (!customerId) {
       throw new Error('Customer ID not found. Please log in again.')
     }
     
-    // Use the individual customer endpoint directly
-    console.log('Fetching customer with appointments...')
     const customerData = await customerApi.getCustomerWithAppointments(customerId)
-    console.log('Customer data response:', customerData)
     
     // Get appointments for the current customer
     const customerAppointments = customerData.appointments || []
-    console.log('Customer appointments:', customerAppointments)
     
     // Transform API response to match our component structure
     appointments.value = customerAppointments.map(appointment => {
-      console.log('Processing appointment:', appointment)
       
       const transformedAppointment = {
         id: appointment.id,
@@ -493,12 +622,9 @@ const loadAppointments = async () => {
         service_rate: appointment.service_rate
       }
       
-      console.log('Transformed appointment:', transformedAppointment)
       return transformedAppointment
     })
     
-    console.log('Final transformed appointments:', appointments.value)
-    console.log('Appointments length:', appointments.value.length)
     
   } catch (err) {
     console.error('Error loading appointments:', err)
@@ -630,6 +756,54 @@ const bookAgain = (appointment) => {
   bottom: 0;
   background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><circle cx="200" cy="200" r="100" fill="rgba(255,255,255,0.1)"/><circle cx="800" cy="300" r="150" fill="rgba(255,255,255,0.05)"/><circle cx="600" cy="700" r="120" fill="rgba(255,255,255,0.08)"/></svg>');
   opacity: 0.3;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.filter-group label {
+  font-weight: 600;
+  color: #374151;
+  min-width: 100px;
+  font-size: 14px;
+}
+
+.filter-group select {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: white;
+  color: #374151;
+  font-size: 14px;
+  min-width: 150px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-group select:hover {
+  border-color: #9ca3af;
+}
+
+.filter-group select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Container for filter groups */
+.filters-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
 }
 
 .header-content {
@@ -1417,6 +1591,79 @@ const bookAgain = (appointment) => {
   border-color: #cbd5e1;
 }
 
+/* Toast Notification Styles */
+.toast-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  max-width: 400px;
+  padding: 16px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  animation: slideInRight 0.3s ease;
+}
+
+.toast-notification.success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border-left: 4px solid #065f46;
+}
+
+.toast-notification.error {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border-left: 4px solid #991b1b;
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.toast-message {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.toast-close:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .professional-header {
@@ -1512,6 +1759,12 @@ const bookAgain = (appointment) => {
     align-items: center;
     gap: 1rem;
     text-align: center;
+  }
+    .toast-notification {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
   }
 }
 

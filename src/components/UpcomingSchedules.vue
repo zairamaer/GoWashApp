@@ -127,57 +127,8 @@
                 Cancel
               </button>
             </div>
-            <div class="edit-actions">
-              <button @click="editAppointment(appointment)" class="action-btn edit-btn" title="Edit appointment">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                </svg>
-                Edit
-              </button>
-            </div>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- Edit Appointment Modal -->
-    <div v-if="showEditModal" class="modal-overlay" @click="closeModal">
-      <div class="modal" @click.stop>
-        <div class="modal-header">
-          <h3>Edit Appointment</h3>
-          <button @click="closeModal" class="close-btn">&times;</button>
-        </div>
-        <form @submit.prevent="saveAppointment" class="modal-form">
-          <div class="form-group">
-            <label>Customer</label>
-            <input type="text" :value="editingAppointment?.customer?.name" disabled />
-          </div>
-          
-          <div class="form-group">
-            <label>Service</label>
-            <input type="text" :value="getServiceName(editingAppointment?.service_rate?.serviceTypeID)" disabled />
-          </div>
-          
-          <div class="form-group">
-            <label>Date & Time</label>
-            <input 
-              type="datetime-local" 
-              v-model="appointmentForm.appointmentDateTime" 
-              required 
-            />
-          </div>
-          
-          <div class="form-group">
-            <label>Notes</label>
-            <textarea v-model="appointmentForm.notes" rows="3" placeholder="Add any notes about this appointment..."></textarea>
-          </div>
-          
-          <div class="modal-actions">
-            <button type="button" @click="closeModal" class="cancel-btn">Cancel</button>
-            <button type="submit" class="save-btn">Save Changes</button>
-          </div>
-        </form>
       </div>
     </div>
   </div>
@@ -197,10 +148,6 @@ const loading = ref(false)
 const timePeriod = ref('all')
 const searchQuery = ref('')
 const sortBy = ref('date')
-
-// Modal state
-const showEditModal = ref(false)
-const editingAppointment = ref(null)
 
 // Form data
 const appointmentForm = reactive({
@@ -389,13 +336,6 @@ const updateAppointmentStatus = async (appointmentID, newStatus) => {
   }
 }
 
-const editAppointment = (appointment) => {
-  editingAppointment.value = appointment
-  appointmentForm.appointmentDateTime = formatDateTimeForInput(appointment.appointmentDateTime)
-  appointmentForm.notes = appointment.notes || ''
-  showEditModal.value = true
-}
-
 const saveAppointment = async () => {
   try {
     await appointmentApi.updateAppointment(editingAppointment.value.appointmentID, appointmentForm)
@@ -413,15 +353,6 @@ const saveAppointment = async () => {
     console.error('Error saving appointment:', error)
     alert('Failed to save appointment changes')
   }
-}
-
-const closeModal = () => {
-  showEditModal.value = false
-  editingAppointment.value = null
-  Object.assign(appointmentForm, {
-    appointmentDateTime: '',
-    notes: ''
-  })
 }
 
 const formatDate = (dateTimeString) => {
@@ -994,10 +925,186 @@ onMounted(() => {
   background: #5a67d8;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
+/* Enhanced Responsive Media Queries for Upcoming Schedules */
+
+/* Extra Large Screens (Desktops 1400px+) */
+@media (min-width: 1400px) {
+  .upcoming-schedules {
+    padding: 32px 48px;
+  }
+  
+  .page-header {
+    padding: 64px 48px;
+    margin-bottom: 48px;
+  }
+  
+  .page-header h1 {
+    font-size: 52px;
+  }
+  
+  .page-header p {
+    font-size: 24px;
+  }
+  
+  .filters-section {
+    padding: 32px;
+    margin-bottom: 32px;
+  }
+  
+  .filters-row {
+    gap: 32px;
+  }
+  
+  .filter-group {
+    min-width: 240px;
+  }
+  
+  .schedules-list {
+    padding: 32px;
+    gap: 24px;
+  }
+  
+  .schedule-card {
+    padding: 32px;
+  }
+  
+  .schedule-details {
+    gap: 32px;
+  }
+}
+
+/* Large Screens (Desktops 1024px - 1399px) */
+@media (min-width: 1024px) and (max-width: 1399px) {
+  .upcoming-schedules {
+    padding: 28px 32px;
+  }
+  
+  .page-header h1 {
+    font-size: 46px;
+  }
+  
+  .page-header p {
+    font-size: 22px;
+  }
+  
+  .filters-section {
+    padding: 28px;
+  }
+  
+  .schedules-list {
+    padding: 28px;
+    gap: 20px;
+  }
+  
+  .schedule-card {
+    padding: 28px;
+  }
+}
+
+/* Medium Screens (Tablets 768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .upcoming-schedules {
+    padding: 20px;
+  }
+  
+  .page-header {
+    padding: 40px 28px;
+    margin-bottom: 28px;
+  }
+  
+  .page-header h1 {
+    font-size: 36px;
+  }
+  
+  .page-header p {
+    font-size: 18px;
+  }
+  
+  .filters-section {
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  
+  .filters-row {
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  
+  .filter-group {
+    min-width: 180px;
+    flex: 1;
+  }
+  
+  .schedules-list {
+    padding: 24px;
+    gap: 18px;
+  }
+  
+  .schedule-card {
+    padding: 24px;
+  }
+  
+  .schedule-header {
+    margin-bottom: 16px;
+  }
+  
+  .appointment-info h3 {
+    font-size: 17px;
+  }
+  
+  .customer-name,
+  .appointment-datetime .date {
+    font-size: 15px;
+  }
+  
+  .schedule-details {
+    gap: 20px;
+  }
+  
+  .service-info {
+    min-width: 160px;
+  }
+  
+  .vehicle-info {
+    min-width: 100px;
+  }
+  
+  .price-info {
+    min-width: 80px;
+  }
+  
+  .price {
+    font-size: 17px;
+  }
+  
+  .action-btn {
+    padding: 9px 14px;
+    font-size: 13px;
+  }
+}
+
+/* Small Screens (Mobile Landscape/Small Tablets 481px - 767px) */
+@media (min-width: 481px) and (max-width: 767px) {
   .upcoming-schedules {
     padding: 16px;
+  }
+  
+  .page-header {
+    padding: 32px 20px;
+    margin-bottom: 24px;
+  }
+  
+  .page-header h1 {
+    font-size: 32px;
+  }
+  
+  .page-header p {
+    font-size: 16px;
+  }
+  
+  .filters-section {
+    padding: 20px;
+    margin-bottom: 20px;
   }
   
   .filters-row {
@@ -1009,19 +1116,94 @@ onMounted(() => {
     min-width: auto;
   }
   
+  .filter-group input,
+  .filter-group select {
+    padding: 12px 14px;
+    font-size: 15px;
+  }
+  
+  .schedules-list {
+    padding: 20px;
+    gap: 16px;
+  }
+  
+  .schedule-card {
+    padding: 20px;
+  }
+  
   .schedule-header {
     flex-direction: column;
     gap: 12px;
+    margin-bottom: 16px;
   }
   
   .appointment-datetime {
     text-align: left;
   }
   
+  .appointment-info h3 {
+    font-size: 16px;
+    margin-bottom: 6px;
+  }
+  
+  .customer-name {
+    font-size: 15px;
+  }
+  
+  .customer-contact {
+    font-size: 13px;
+  }
+  
+  .appointment-datetime .date {
+    font-size: 15px;
+  }
+  
+  .appointment-datetime .time {
+    font-size: 13px;
+  }
+  
   .schedule-details {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+    margin-bottom: 16px;
+  }
+  
+  .service-info {
+    min-width: auto;
+    width: 100%;
+  }
+  
+  .service-name {
+    font-size: 15px;
+  }
+  
+  .service-description {
+    font-size: 13px;
+  }
+  
+  .vehicle-info,
+  .price-info {
+    min-width: auto;
+    width: 100%;
+    text-align: left;
+  }
+  
+  .price {
+    font-size: 16px;
+  }
+  
+  .notes-section {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  
+  .notes-label {
+    font-size: 13px;
+  }
+  
+  .notes-content {
+    font-size: 13px;
   }
   
   .schedule-actions {
@@ -1033,11 +1215,477 @@ onMounted(() => {
   .status-actions,
   .edit-actions {
     justify-content: center;
+    gap: 10px;
   }
   
   .action-btn {
     flex: 1;
     justify-content: center;
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+  
+  .modal {
+    max-width: 450px;
+    margin: 20px;
+    width: calc(100% - 40px);
+  }
+  
+  .modal-header {
+    padding: 18px 20px;
+  }
+  
+  .modal-form {
+    padding: 20px;
+  }
+  
+  .form-group {
+    margin-bottom: 18px;
+  }
+  
+  .form-group input,
+  .form-group textarea {
+    padding: 12px 14px;
+    font-size: 15px;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .modal-actions .cancel-btn,
+  .modal-actions .save-btn {
+    width: 100%;
+    padding: 12px 16px;
+    text-align: center;
+  }
+}
+
+/* Extra Small Screens (Mobile Portrait 320px - 480px) */
+@media (max-width: 480px) {
+  .upcoming-schedules {
+    padding: 12px;
+  }
+  
+  .page-header {
+    padding: 24px 16px;
+    margin-bottom: 20px;
+    border-radius: 16px;
+  }
+  
+  .page-header h1 {
+    font-size: 28px;
+    line-height: 1.2;
+    margin-bottom: 12px;
+  }
+  
+  .page-header p {
+    font-size: 15px;
+  }
+  
+  .filters-section {
+    padding: 16px;
+    margin-bottom: 16px;
+    border-radius: 10px;
+  }
+  
+  .filters-row {
+    gap: 14px;
+  }
+  
+  .filter-group label {
+    font-size: 13px;
+  }
+  
+  .filter-group input,
+  .filter-group select {
+    padding: 10px 12px;
+    font-size: 14px;
+    border-radius: 8px;
+  }
+  
+  .schedules-container {
+    border-radius: 10px;
+  }
+  
+  .schedules-list {
+    padding: 16px;
+    gap: 14px;
+  }
+  
+  .schedule-card {
+    padding: 16px;
+    border-radius: 10px;
+  }
+  
+  .schedule-header {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  
+  .appointment-info h3 {
+    font-size: 15px;
+    margin-bottom: 6px;
+  }
+  
+  .customer-name {
+    font-size: 14px;
+  }
+  
+  .customer-contact {
+    font-size: 12px;
+  }
+  
+  .appointment-datetime .date {
+    font-size: 14px;
+  }
+  
+  .appointment-datetime .time {
+    font-size: 12px;
+  }
+  
+  .overdue-badge,
+  .expired-badge {
+    font-size: 10px;
+    padding: 3px 6px;
+    border-radius: 6px;
+  }
+  
+  .schedule-details {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  
+  .service-name {
+    font-size: 14px;
+    margin-bottom: 3px;
+  }
+  
+  .service-description {
+    font-size: 12px;
+  }
+  
+  .vehicle-size {
+    padding: 5px 10px;
+    font-size: 12px;
+    border-radius: 8px;
+  }
+  
+  .price {
+    font-size: 15px;
+  }
+  
+  .notes-section {
+    padding: 12px;
+    margin-bottom: 14px;
+    border-radius: 6px;
+  }
+  
+  .notes-label {
+    font-size: 12px;
+    margin-bottom: 3px;
+  }
+  
+  .notes-content {
+    font-size: 12px;
+  }
+  
+  .schedule-actions {
+    gap: 10px;
+  }
+  
+  .status-actions,
+  .edit-actions {
+    gap: 8px;
+  }
+  
+  .action-btn {
+    padding: 10px 12px;
+    font-size: 13px;
+    border-radius: 6px;
+    gap: 6px;
+  }
+  
+  .loading-state,
+  .empty-state {
+    padding: 40px 16px;
+    border-radius: 10px;
+  }
+  
+  .loading-spinner {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 12px;
+  }
+  
+  .empty-state h3 {
+    font-size: 16px;
+    margin-bottom: 6px;
+  }
+  
+  .empty-state p {
+    font-size: 14px;
+  }
+  
+  .modal {
+    margin: 12px;
+    width: calc(100% - 24px);
+    border-radius: 12px;
+    max-height: calc(100vh - 24px);
+  }
+  
+  .modal-header {
+    padding: 16px;
+    border-radius: 12px 12px 0 0;
+  }
+  
+  .modal-header h3 {
+    font-size: 16px;
+  }
+  
+  .close-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 20px;
+  }
+  
+  .modal-form {
+    padding: 16px;
+  }
+  
+  .form-group {
+    margin-bottom: 16px;
+  }
+  
+  .form-group label {
+    font-size: 13px;
+    margin-bottom: 5px;
+  }
+  
+  .form-group input,
+  .form-group textarea {
+    padding: 10px 12px;
+    font-size: 14px;
+    border-radius: 8px;
+  }
+  
+  .modal-actions {
+    gap: 8px;
+    margin-top: 20px;
+  }
+  
+  .modal-actions .cancel-btn,
+  .modal-actions .save-btn {
+    padding: 12px 16px;
+    font-size: 14px;
+    border-radius: 8px;
+  }
+}
+
+/* Very Small Screens (320px and below) */
+@media (max-width: 320px) {
+  .page-header h1 {
+    font-size: 24px;
+  }
+  
+  .page-header p {
+    font-size: 14px;
+  }
+  
+  .filters-section {
+    padding: 12px;
+  }
+  
+  .schedules-list {
+    padding: 12px;
+    gap: 12px;
+  }
+  
+  .schedule-card {
+    padding: 12px;
+  }
+  
+  .appointment-info h3 {
+    font-size: 14px;
+  }
+  
+  .customer-name,
+  .appointment-datetime .date {
+    font-size: 13px;
+  }
+  
+  .service-name {
+    font-size: 13px;
+  }
+  
+  .price {
+    font-size: 14px;
+  }
+  
+  .action-btn {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  
+  .modal-header h3 {
+    font-size: 15px;
+  }
+  
+  .form-group input,
+  .form-group textarea {
+    font-size: 13px;
+    padding: 9px 10px;
+  }
+}
+
+/* Landscape orientation adjustments for mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+  .page-header {
+    padding: 20px 16px;
+    margin-bottom: 16px;
+  }
+  
+  .page-header h1 {
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+  
+  .page-header p {
+    font-size: 14px;
+  }
+  
+  .filters-section {
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  
+  .schedules-list {
+    padding: 12px;
+    gap: 10px;
+  }
+  
+  .schedule-card {
+    padding: 12px;
+  }
+  
+  .schedule-header {
+    margin-bottom: 10px;
+  }
+  
+  .schedule-details {
+    margin-bottom: 10px;
+  }
+  
+  .notes-section {
+    padding: 8px;
+    margin-bottom: 10px;
+  }
+  
+  .modal {
+    max-height: 95vh;
+  }
+  
+  .modal-header {
+    padding: 12px 16px;
+  }
+  
+  .modal-form {
+    padding: 12px 16px;
+  }
+}
+
+/* High DPI / Retina Display adjustments */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .schedule-card {
+    border-width: 1px;
+  }
+  
+  .filter-group input,
+  .filter-group select,
+  .form-group input,
+  .form-group textarea {
+    border-width: 1px;
+  }
+  
+  .overdue-badge,
+  .expired-badge {
+    border-width: 1px;
+  }
+}
+
+/* Print styles */
+@media print {
+  .upcoming-schedules {
+    padding: 0;
+    background: white !important;
+  }
+  
+  .page-header,
+  .filters-section,
+  .schedules-container {
+    background: white !important;
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+  }
+  
+  .filters-section {
+    display: none !important;
+  }
+  
+  .modal-overlay {
+    display: none !important;
+  }
+  
+  .schedule-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+  }
+  
+  .schedule-card:hover {
+    border-color: #ccc !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+  
+  .schedule-actions {
+    display: none !important;
+  }
+  
+  .overdue-badge,
+  .expired-badge,
+  .vehicle-size {
+    background: white !important;
+    color: black !important;
+    border: 1px solid #ccc !important;
+  }
+  
+  .action-btn {
+    display: none !important;
+  }
+}
+
+/* Accessibility - Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .schedule-card,
+  .action-btn,
+  .filter-group input,
+  .filter-group select,
+  .form-group input,
+  .form-group textarea,
+  .modal-actions .cancel-btn,
+  .modal-actions .save-btn {
+    transition: none;
+  }
+  
+  .loading-spinner {
+    animation: none;
+  }
+  
+  .schedule-card:hover {
+    transform: none;
   }
 }
 </style>

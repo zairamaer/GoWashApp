@@ -363,7 +363,6 @@ defineExpose({
   width: 32px;
   height: 32px;
   object-fit: contain;
-  filter: brightness(0) saturate(100%) invert(27%) sepia(51%) saturate(2878%) hue-rotate(231deg) brightness(97%) contrast(101%);
   transition: transform 0.3s ease;
 }
 

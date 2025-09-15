@@ -289,7 +289,9 @@ const sortCustomers = () => {
 }
 
 const getCustomerAppointmentCount = (customerId) => {
-  return appointments.value.filter(apt => apt.customerID == customerId).length
+  return appointments.value.filter(apt => 
+    apt.customerID == customerId && apt.status === 'confirmed'
+  ).length
 }
 
 const viewCustomerDetails = (customer) => {
@@ -1026,9 +1028,299 @@ onMounted(() => {
   opacity: 0.8;
 }
 
-@media (max-width: 768px) {
+/* Enhanced Responsive Media Queries for Customer Management */
+
+/* Extra Large Screens (Desktops 1400px+) */
+@media (min-width: 1400px) {
+  .customer-management {
+    padding: 32px 48px;
+  }
+  
+  .page-header {
+    padding: 64px 48px;
+    margin-bottom: 48px;
+  }
+  
+  .page-header h1 {
+    font-size: 52px;
+  }
+  
+  .page-header p {
+    font-size: 24px;
+  }
+  
+  .filters-section {
+    padding: 40px;
+    margin-bottom: 40px;
+  }
+  
+  .filters-row {
+    gap: 40px;
+  }
+  
+  .filter-group {
+    min-width: 280px;
+  }
+  
+  .data-table {
+    min-width: 1200px;
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: 24px 32px;
+  }
+  
+  .customer-avatar {
+    width: 56px;
+    height: 56px;
+  }
+  
+  .profile-avatar {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .profile-info h4 {
+    font-size: 28px;
+  }
+  
+  .modal {
+    max-width: 700px;
+  }
+  
+  .modal-content,
+  .modal-form {
+    padding: 40px;
+  }
+  
+  .stat-item {
+    padding: 32px 40px;
+    min-width: 140px;
+  }
+  
+  .stat-number {
+    font-size: 40px;
+  }
+}
+
+/* Large Screens (Desktops 1024px - 1399px) */
+@media (min-width: 1024px) and (max-width: 1399px) {
+  .customer-management {
+    padding: 28px 32px;
+  }
+  
+  .page-header h1 {
+    font-size: 46px;
+  }
+  
+  .page-header p {
+    font-size: 22px;
+  }
+  
+  .filters-section {
+    padding: 36px;
+  }
+  
+  .data-table {
+    min-width: 1100px;
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: 22px 28px;
+  }
+  
+  .customer-avatar {
+    width: 52px;
+    height: 52px;
+  }
+  
+  .profile-avatar {
+    width: 88px;
+    height: 88px;
+  }
+}
+
+/* Medium Screens (Tablets 768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .customer-management {
+    padding: 20px;
+  }
+  
+  .page-header {
+    padding: 40px 28px;
+    margin-bottom: 28px;
+  }
+  
+  .page-header h1 {
+    font-size: 36px;
+  }
+  
+  .page-header p {
+    font-size: 18px;
+  }
+  
+  .filters-section {
+    padding: 28px;
+    margin-bottom: 28px;
+  }
+  
+  .filters-row {
+    flex-wrap: wrap;
+    gap: 24px;
+  }
+  
+  .filter-group {
+    min-width: 200px;
+    flex: 1;
+  }
+  
+  .filter-group input,
+  .filter-group select {
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+  
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .data-table {
+    min-width: 900px;
+    font-size: 14px;
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: 18px 20px;
+  }
+  
+  .customer-info {
+    gap: 12px;
+  }
+  
+  .customer-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+  }
+  
+  .customer-name {
+    font-size: 15px;
+  }
+  
+  .customer-id {
+    font-size: 12px;
+  }
+  
+  .contact-item {
+    font-size: 13px;
+  }
+  
+  .count-badge {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  
+  .count-label {
+    font-size: 11px;
+  }
+  
+  .status-badge {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  
+  .view-btn,
+  .edit-btn {
+    padding: 10px;
+  }
+  
+  .modal {
+    max-width: 520px;
+  }
+  
+  .modal-content,
+  .modal-form {
+    padding: 28px;
+  }
+  
+  .customer-profile {
+    gap: 20px;
+    padding: 20px;
+  }
+  
+  .profile-avatar {
+    width: 72px;
+    height: 72px;
+    border-radius: 20px;
+  }
+  
+  .profile-info h4 {
+    font-size: 22px;
+  }
+  
+  .details-section {
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  
+  .details-section h5 {
+    font-size: 16px;
+    margin-bottom: 16px;
+  }
+  
+  .detail-item {
+    padding: 14px 0;
+  }
+  
+  .detail-item label,
+  .detail-item span {
+    font-size: 14px;
+  }
+  
+  .appointment-stats {
+    gap: 16px;
+  }
+  
+  .stat-item {
+    padding: 20px 28px;
+    min-width: 100px;
+  }
+  
+  .stat-number {
+    font-size: 28px;
+  }
+  
+  .stat-label {
+    font-size: 12px;
+  }
+}
+
+/* Small Screens (Mobile Landscape/Small Tablets 481px - 767px) */
+@media (min-width: 481px) and (max-width: 767px) {
   .customer-management {
     padding: 16px;
+  }
+  
+  .page-header {
+    padding: 32px 20px;
+    margin-bottom: 24px;
+  }
+  
+  .page-header h1 {
+    font-size: 32px;
+  }
+  
+  .page-header p {
+    font-size: 16px;
+  }
+  
+  .filters-section {
+    padding: 24px;
+    margin-bottom: 24px;
   }
   
   .filters-row {
@@ -1040,24 +1332,360 @@ onMounted(() => {
     min-width: auto;
   }
   
-  .data-table {
+  .filter-group label {
     font-size: 14px;
   }
   
-  .data-table th,
+  .filter-group input,
+  .filter-group select {
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+  
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .data-table {
+    min-width: 800px;
+    font-size: 13px;
+  }
+  
+  .data-table th {
+    padding: 16px 18px;
+    font-size: 12px;
+  }
+  
   .data-table td {
-    padding: 16px 12px;
+    padding: 16px 18px;
+  }
+  
+  .customer-info {
+    gap: 10px;
+  }
+  
+  .customer-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+  }
+  
+  .customer-name {
+    font-size: 14px;
+  }
+  
+  .customer-id {
+    font-size: 11px;
+  }
+  
+  .contact-item {
+    font-size: 12px;
+    gap: 8px;
+  }
+  
+  .count-badge {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+  
+  .count-label {
+    font-size: 10px;
+  }
+  
+  .status-badge {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+  
+  .action-buttons {
+    gap: 8px;
+  }
+  
+  .view-btn,
+  .edit-btn {
+    padding: 8px;
+  }
+  
+  .modal {
+    width: calc(100% - 32px);
+    margin: 16px;
+    max-width: none;
+  }
+  
+  .modal-header {
+    padding: 24px 24px 0;
+  }
+  
+  .modal-header h3 {
+    font-size: 20px;
+  }
+  
+  .close-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+  
+  .modal-content,
+  .modal-form {
+    padding: 24px;
   }
   
   .customer-profile {
     flex-direction: column;
     text-align: center;
     gap: 16px;
+    padding: 20px;
+  }
+  
+  .profile-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+  }
+  
+  .profile-info h4 {
+    font-size: 20px;
+  }
+  
+  .profile-info .customer-id {
+    font-size: 14px;
+  }
+  
+  .details-section {
+    padding: 18px;
+    margin-bottom: 20px;
+  }
+  
+  .details-section h5 {
+    font-size: 15px;
+    margin-bottom: 14px;
+  }
+  
+  .detail-item {
+    padding: 12px 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .detail-item label {
+    font-size: 13px;
+  }
+  
+  .detail-item span {
+    font-size: 13px;
+    padding: 6px 10px;
+  }
+  
+  .appointment-stats {
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .stat-item {
+    padding: 18px 24px;
+    min-width: 80px;
+    width: 100%;
+    max-width: 200px;
+  }
+  
+  .stat-number {
+    font-size: 24px;
+  }
+  
+  .stat-label {
+    font-size: 11px;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-group label {
+    font-size: 14px;
+  }
+  
+  .form-group input {
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .cancel-btn,
+  .save-btn {
+    width: 100%;
+    padding: 14px 20px;
+    text-align: center;
+  }
+}
+
+/* Extra Small Screens (Mobile Portrait 320px - 480px) */
+@media (max-width: 480px) {
+  .customer-management {
+    padding: 12px;
+  }
+  
+  .page-header {
+    padding: 24px 16px;
+    margin-bottom: 20px;
+    border-radius: 16px;
+  }
+  
+  .page-header h1 {
+    font-size: 28px;
+    line-height: 1.2;
+    margin-bottom: 12px;
+  }
+  
+  .page-header p {
+    font-size: 15px;
+  }
+  
+  .filters-section {
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 16px;
+  }
+  
+  .filters-row {
+    gap: 16px;
+  }
+  
+  .filter-group label {
+    font-size: 13px;
+  }
+  
+  .filter-group input,
+  .filter-group select {
+    padding: 10px 12px;
+    font-size: 13px;
+    border-radius: 10px;
+  }
+  
+  .table-container {
+    border-radius: 16px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .data-table {
+    min-width: 700px;
+    font-size: 12px;
+  }
+  
+  .data-table th {
+    padding: 14px 16px;
+    font-size: 11px;
+  }
+  
+  .data-table td {
+    padding: 14px 16px;
+  }
+  
+  .customer-info {
+    gap: 8px;
+  }
+  
+  .customer-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+  
+  .customer-name {
+    font-size: 13px;
+  }
+  
+  .customer-id {
+    font-size: 10px;
+  }
+  
+  .contact-item {
+    font-size: 11px;
+    gap: 6px;
+  }
+  
+  .count-badge {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  
+  .count-label {
+    font-size: 9px;
+  }
+  
+  .status-badge {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+  
+  .action-buttons {
+    gap: 6px;
+  }
+  
+  .view-btn,
+  .edit-btn {
+    padding: 6px;
+  }
+  
+  .loading-state,
+  .empty-state {
+    padding: 60px 16px;
+    border-radius: 16px;
+  }
+  
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 16px;
+  }
+  
+  .loading-state p {
+    font-size: 16px;
+  }
+  
+  .empty-state h3 {
+    font-size: 20px;
+    margin-bottom: 8px;
+  }
+  
+  .empty-state p {
+    font-size: 14px;
   }
   
   .modal {
-    width: 95%;
-    margin: 10px;
+    margin: 12px;
+    width: calc(100% - 24px);
+    border-radius: 16px;
+    max-height: calc(100vh - 24px);
+  }
+  
+  .modal-header {
+    padding: 20px 20px 0;
+  }
+  
+  .modal-header::after {
+    left: 20px;
+    right: 20px;
+    bottom: -12px;
+  }
+  
+  .modal-header h3 {
+    font-size: 18px;
+  }
+  
+  .close-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+    border-radius: 8px;
   }
   
   .modal-content,
@@ -1065,9 +1693,334 @@ onMounted(() => {
     padding: 20px;
   }
   
-  .appointment-stats {
+  .customer-profile {
+    gap: 12px;
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+  }
+  
+  .profile-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+  }
+  
+  .profile-info h4 {
+    font-size: 18px;
+  }
+  
+  .profile-info .customer-id {
+    font-size: 13px;
+  }
+  
+  .details-section {
+    padding: 16px;
+    margin-bottom: 20px;
+    border-radius: 12px;
+  }
+  
+  .details-section h5 {
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+  
+  .details-section h5::before {
+    width: 3px;
+    height: 16px;
+  }
+  
+  .detail-item {
+    padding: 10px 0;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  
+  .detail-item label {
+    font-size: 12px;
+  }
+  
+  .detail-item span {
+    font-size: 12px;
+    padding: 5px 8px;
+    border-radius: 6px;
+  }
+  
+  .appointment-stats {
+    gap: 10px;
+  }
+  
+  .stat-item {
+    padding: 16px 20px;
+    border-radius: 12px;
+    min-width: 60px;
+    width: 100%;
+    max-width: 160px;
+  }
+  
+  .stat-number {
+    font-size: 20px;
+  }
+  
+  .stat-label {
+    font-size: 10px;
+  }
+  
+  .form-group {
+    margin-bottom: 18px;
+  }
+  
+  .form-group label {
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+  
+  .form-group input {
+    padding: 10px 12px;
+    font-size: 13px;
+    border-radius: 10px;
+  }
+  
+  .modal-actions {
+    gap: 10px;
+    margin-top: 24px;
+  }
+  
+  .cancel-btn,
+  .save-btn {
+    padding: 12px 16px;
+    font-size: 14px;
+    border-radius: 10px;
+  }
+}
+
+/* Very Small Screens (320px and below) */
+@media (max-width: 320px) {
+  .page-header h1 {
+    font-size: 24px;
+  }
+  
+  .page-header p {
+    font-size: 14px;
+  }
+  
+  .filters-section {
+    padding: 16px;
+  }
+  
+  .data-table {
+    min-width: 600px;
+    font-size: 11px;
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: 12px 14px;
+  }
+  
+  .customer-avatar {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .customer-name {
+    font-size: 12px;
+  }
+  
+  .profile-avatar {
+    width: 48px;
+    height: 48px;
+  }
+  
+  .profile-info h4 {
+    font-size: 16px;
+  }
+  
+  .modal-header h3 {
+    font-size: 16px;
+  }
+  
+  .stat-item {
+    padding: 12px 16px;
+  }
+  
+  .stat-number {
+    font-size: 18px;
+  }
+}
+
+/* Landscape orientation adjustments for mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+  .page-header {
+    padding: 20px 16px;
+    margin-bottom: 16px;
+  }
+  
+  .page-header h1 {
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+  
+  .page-header p {
+    font-size: 14px;
+  }
+  
+  .filters-section {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  
+  .modal {
+    max-height: 95vh;
+  }
+  
+  .modal-header {
+    padding: 16px 20px 0;
+  }
+  
+  .modal-content,
+  .modal-form {
+    padding: 16px 20px;
+  }
+  
+  .customer-profile {
+    flex-direction: row;
+    text-align: left;
+    gap: 16px;
+    padding: 12px;
+  }
+  
+  .appointment-stats {
+    flex-direction: row;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .stat-item {
+    min-width: 80px;
+    width: auto;
+    max-width: none;
+    flex: 1;
+  }
+}
+
+/* High DPI / Retina Display adjustments */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .filter-group input,
+  .filter-group select,
+  .form-group input {
+    border-width: 1px;
+  }
+  
+  .data-table th {
+    border-bottom-width: 1px;
+  }
+  
+  .data-table td {
+    border-bottom-width: 0.5px;
+  }
+  
+  .detail-item {
+    border-bottom-width: 0.5px;
+  }
+}
+
+/* Print styles */
+@media print {
+  .customer-management {
+    padding: 0;
+    background: white !important;
+  }
+  
+  .page-header,
+  .filters-section,
+  .table-container {
+    background: white !important;
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+    backdrop-filter: none !important;
+  }
+  
+  .filters-section {
+    display: none !important;
+  }
+  
+  .modal-overlay {
+    display: none !important;
+  }
+  
+  .data-table tr:hover {
+    background: transparent !important;
+    transform: none !important;
+  }
+  
+  .customer-avatar,
+  .profile-avatar {
+    background: white !important;
+    color: black !important;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+  }
+  
+  .status-badge,
+  .count-badge {
+    background: white !important;
+    color: black !important;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+  }
+  
+  .action-buttons {
+    display: none !important;
+  }
+  
+  .stat-item {
+    background: white !important;
+    color: black !important;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+  }
+  
+  .stat-number,
+  .stat-label {
+    color: black !important;
+  }
+}
+
+/* Accessibility - Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .filter-group input,
+  .filter-group select,
+  .form-group input,
+  .data-table tr,
+  .view-btn,
+  .edit-btn,
+  .cancel-btn,
+  .save-btn,
+  .close-btn {
+    transition: none;
+  }
+  
+  .loading-spinner {
+    animation: none;
+  }
+  
+  .modal-overlay {
+    animation: none;
+  }
+  
+  .modal {
+    animation: none;
+  }
+  
+  .data-table tr:hover,
+  .view-btn:hover,
+  .edit-btn:hover,
+  .cancel-btn:hover,
+  .save-btn:hover,
+  .close-btn:hover {
+    transform: none;
   }
 }
 </style>

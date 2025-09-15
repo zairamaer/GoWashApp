@@ -20,19 +20,6 @@
           <p>Total Paid ({{ paidCount }} appointments)</p>
         </div>
       </div>
-      
-      <div class="summary-card">
-        <div class="card-icon total">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="1" x2="12" y2="23"/>
-            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-          </svg>
-        </div>
-        <div class="card-content">
-          <h3>₱{{ totalRevenue.toFixed(2) }}</h3>
-          <p>Total Revenue ({{ completedAppointments.length }} appointments)</p>
-        </div>
-      </div>
     </div>
 
     <!-- Filters and Search -->
@@ -285,6 +272,11 @@ const appointmentsWithPaymentStatus = computed(() => {
 
 const filteredPayments = computed(() => {
   let filtered = appointmentsWithPaymentStatus.value
+    .filter(apt => {
+      // Only show appointments with paid payments
+      const payment = payments.value.find(p => p.appointmentID === apt.appointmentID)
+      return payment && payment.status === 'paid'
+    })
 
   // Filter by time period
   if (timePeriod.value !== 'all') {
@@ -375,12 +367,6 @@ const loadData = async () => {
     serviceTypes.value = typesData?.data || typesData || []
     vehicleSizes.value = sizesData?.data || sizesData || []
     
-    console.log('Loaded data:', {
-      appointments: appointments.value.length,
-      payments: payments.value.length,
-      serviceTypes: serviceTypes.value.length,
-      vehicleSizes: vehicleSizes.value.length
-    })
   } catch (error) {
     console.error('Error loading data:', error)
   } finally {
@@ -392,12 +378,13 @@ const getPaymentStatus = (appointment) => {
   // Check if there's a payment record
   const payment = payments.value.find(p => p.appointmentID === appointment.appointmentID)
   
+  // Only show "Paid" if payment exists and status is explicitly "paid"
   if (payment && payment.status === 'paid') {
     return 'Paid'
   }
   
-  // Default to unpaid
-  return 'Unpaid'
+  // For all other cases (no payment record, pending, failed, etc.), return empty or hide
+  return '' // This will show nothing
 }
 
 const getPaymentDate = (appointment) => {
@@ -1056,6 +1043,39 @@ onMounted(() => {
   font-weight: 500;
 }
 
+/* Large tablets and small desktops */
+@media (max-width: 1024px) {
+  .summary-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+  
+  .filters-row {
+    gap: 24px;
+  }
+  
+  .filter-group {
+    min-width: 180px;
+  }
+  
+  .data-table {
+    min-width: 1000px;
+  }
+  
+  .page-header {
+    padding: 40px 24px;
+  }
+  
+  .page-header h1 {
+    font-size: 36px;
+  }
+  
+  .page-header p {
+    font-size: 18px;
+  }
+}
+
+/* Tablets */
 @media (max-width: 768px) {
   .payments-management {
     padding: 20px;
@@ -1075,13 +1095,31 @@ onMounted(() => {
     min-width: auto;
   }
   
+  .table-container {
+    margin: 0 -20px;
+    border-radius: 20px 20px 0 0;
+  }
+  
   .data-table {
     font-size: 14px;
+    min-width: 800px;
   }
   
   .data-table th,
   .data-table td {
     padding: 12px 16px;
+  }
+  
+  .customer-name {
+    font-size: 15px;
+  }
+  
+  .customer-contact {
+    font-size: 12px;
+  }
+  
+  .amount-cell {
+    font-size: 16px;
   }
   
   .action-buttons {
@@ -1092,27 +1130,120 @@ onMounted(() => {
   .modal {
     width: 95%;
     margin: 20px;
+    max-height: 85vh;
   }
   
   .modal-header,
   .modal-content {
-    padding: 20px;
+    padding: 24px;
+  }
+  
+  .page-header {
+    padding: 32px 20px;
+    margin-bottom: 24px;
+  }
+  
+  .page-header h1 {
+    font-size: 32px;
+  }
+  
+  .page-header p {
+    font-size: 16px;
+  }
+  
+  .card-content h3 {
+    font-size: 24px;
+  }
+  
+  .summary-card {
+    padding: 28px;
+  }
+  
+  .filters-section,
+  .table-container {
+    margin-bottom: 24px;
+  }
+}
+
+/* Large mobile devices */
+@media (max-width: 640px) {
+  .payments-management {
+    padding: 16px;
+  }
+  
+  .page-header {
+    padding: 28px 16px;
+    margin-bottom: 20px;
   }
   
   .page-header h1 {
     font-size: 28px;
   }
   
+  .page-header p {
+    font-size: 15px;
+  }
+  
+  .summary-card {
+    padding: 24px;
+    gap: 16px;
+  }
+  
   .card-content h3 {
-    font-size: 24px;
+    font-size: 22px;
+  }
+  
+  .filters-section {
+    padding: 24px;
+  }
+  
+  .data-table {
+    min-width: 700px;
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: 10px 12px;
+  }
+  
+  .modal-header h3 {
+    font-size: 20px;
+  }
+  
+  .detail-section h4 {
+    font-size: 16px;
+  }
+  
+  .detail-item {
+    padding: 10px 12px;
   }
 }
 
+/* Small mobile devices */
 @media (max-width: 480px) {
+  .payments-management {
+    padding: 12px;
+  }
+  
+  .page-header {
+    padding: 24px 16px;
+    margin-bottom: 16px;
+  }
+  
+  .page-header h1 {
+    font-size: 24px;
+    line-height: 1.2;
+  }
+  
+  .page-header p {
+    font-size: 14px;
+  }
+  
   .summary-card {
-    padding: 24px;
+    padding: 20px;
     flex-direction: column;
     text-align: center;
+    gap: 12px;
   }
   
   .card-icon {
@@ -1120,13 +1251,158 @@ onMounted(() => {
     height: 50px;
   }
   
+  .card-content h3 {
+    font-size: 20px;
+  }
+  
+  .card-content p {
+    font-size: 14px;
+  }
+  
   .filters-section {
     padding: 20px;
   }
   
+  .filter-group input,
+  .filter-group select {
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+  
+  .data-table {
+    min-width: 600px;
+    font-size: 13px;
+  }
+  
   .data-table th,
   .data-table td {
-    padding: 8px 12px;
+    padding: 8px 10px;
+  }
+  
+  .customer-name {
+    font-size: 14px;
+  }
+  
+  .customer-contact {
+    font-size: 11px;
+  }
+  
+  .service-name {
+    font-size: 14px;
+  }
+  
+  .vehicle-size {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+  
+  .date {
+    font-size: 14px;
+  }
+  
+  .time {
+    font-size: 12px;
+  }
+  
+  .amount-cell {
+    font-size: 15px;
+  }
+  
+  .payment-status-badge {
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+  
+  .payment-date {
+    font-size: 13px;
+  }
+  
+  .view-btn {
+    padding: 10px;
+  }
+  
+  .modal {
+    width: 95%;
+    margin: 10px;
+    max-height: 90vh;
+  }
+  
+  .modal-header,
+  .modal-content {
+    padding: 20px;
+  }
+  
+  .modal-header h3 {
+    font-size: 18px;
+  }
+  
+  .detail-section {
+    margin-bottom: 24px;
+  }
+  
+  .detail-section h4 {
+    font-size: 15px;
+  }
+  
+  .detail-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px;
+  }
+  
+  .detail-item label {
+    font-size: 13px;
+  }
+  
+  .detail-item span {
+    font-size: 14px;
+  }
+  
+  .loading-state,
+  .empty-state {
+    padding: 60px 20px;
+  }
+  
+  .loading-state p,
+  .empty-state p {
+    font-size: 14px;
+  }
+  
+  .empty-state h3 {
+    font-size: 18px;
+  }
+}
+
+/* Extra small mobile devices */
+@media (max-width: 360px) {
+  .page-header h1 {
+    font-size: 22px;
+  }
+  
+  .summary-card {
+    padding: 16px;
+  }
+  
+  .card-content h3 {
+    font-size: 18px;
+  }
+  
+  .filters-section {
+    padding: 16px;
+  }
+  
+  .data-table {
+    min-width: 500px;
+  }
+  
+  .modal-header,
+  .modal-content {
+    padding: 16px;
+  }
+  
+  .detail-item {
+    padding: 10px;
   }
 }
 </style>

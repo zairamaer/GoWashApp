@@ -767,45 +767,36 @@ onMounted(() => {
 }
 
 .form-group {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .form-group label {
   display: block;
-  color: #1a202c;
-  font-weight: 700;
-  margin-bottom: 8px;
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  color: #4a5568;
+  font-weight: 500;
+  margin-bottom: 6px;
 }
 
 .form-group input,
-.form-group select,
 .form-group textarea {
   width: 100%;
-  padding: 14px 18px;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  font-size: 15px;
-  font-weight: 500;
-  background: white;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s;
 }
 
 .form-group input:focus,
-.form-group select:focus,
 .form-group textarea:focus {
   outline: none;
   border-color: #667eea;
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
-  transform: translateY(-1px);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .form-group input:disabled {
   background: #f7fafc;
   color: #718096;
-  border-color: #e2e8f0;
 }
 
 .modal-actions {
@@ -922,68 +913,721 @@ onMounted(() => {
   font-weight: 500;
 }
 
-@media (max-width: 768px) {
+/* Progressive Responsive Design - Mobile First Approach with Fluid Scaling */
+
+/* Base styles (Mobile First - 320px+) */
+.appointments-management {
+  padding: clamp(8px, 3vw, 12px);
+  min-height: calc(100vh - 64px);
+}
+
+.page-header {
+  padding: clamp(16px, 4vw, 24px) clamp(12px, 3vw, 16px);
+  margin-bottom: clamp(12px, 3vw, 20px);
+  border-radius: clamp(12px, 2vw, 16px);
+}
+
+.page-header h1 {
+  font-size: clamp(20px, 6vw, 28px);
+  line-height: 1.2;
+  margin-bottom: clamp(6px, 2vw, 12px);
+}
+
+.page-header p {
+  font-size: clamp(13px, 4vw, 16px);
+}
+
+.filters-section {
+  padding: clamp(14px, 4vw, 20px);
+  border-radius: clamp(12px, 2vw, 16px);
+  margin-bottom: clamp(12px, 3vw, 20px);
+}
+
+.filters-row {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 3vw, 16px);
+}
+
+.filter-group label {
+  font-size: clamp(12px, 3vw, 14px);
+}
+
+.filter-group input,
+.filter-group select {
+  padding: clamp(10px, 3vw, 12px) clamp(12px, 3vw, 14px);
+  font-size: clamp(13px, 4vw, 15px);
+  border-radius: clamp(8px, 2vw, 12px);
+}
+
+.table-container {
+  border-radius: clamp(12px, 2vw, 16px);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 clamp(-12px, -3vw, 0px);
+}
+
+.data-table {
+  min-width: 600px;
+  font-size: clamp(12px, 3vw, 14px);
+}
+
+.data-table th,
+.data-table td {
+  padding: clamp(8px, 2vw, 12px) clamp(10px, 2vw, 14px);
+}
+
+.customer-name,
+.service-name,
+.date {
+  font-size: clamp(12px, 3vw, 14px);
+}
+
+.customer-contact,
+.service-description,
+.time {
+  font-size: clamp(11px, 3vw, 13px);
+}
+
+.status-badge,
+.vehicle-size {
+  padding: clamp(4px, 1vw, 6px) clamp(8px, 2vw, 12px);
+  font-size: clamp(9px, 2vw, 11px);
+}
+
+.price-cell {
+  font-size: clamp(13px, 4vw, 16px);
+}
+
+.modal {
+  margin: clamp(8px, 2vw, 16px);
+  width: calc(100% - clamp(16px, 4vw, 32px));
+  border-radius: clamp(12px, 2vw, 16px);
+  max-height: calc(100vh - clamp(16px, 4vw, 32px));
+}
+
+.modal-header,
+.modal-form {
+  padding: clamp(16px, 4vw, 24px);
+}
+
+.modal-header h3 {
+  font-size: clamp(18px, 5vw, 24px);
+}
+
+.modal-actions {
+  flex-direction: column;
+  gap: clamp(8px, 2vw, 12px);
+}
+
+/* Small Mobile Enhanced - 375px+ */
+@media (min-width: 375px) {
   .appointments-management {
-    padding: 16px;
+    padding: clamp(12px, 3vw, 16px);
+  }
+  
+  .page-header {
+    padding: clamp(20px, 5vw, 28px) clamp(16px, 4vw, 20px);
+    margin-bottom: clamp(16px, 4vw, 24px);
+    border-radius: clamp(14px, 2vw, 18px);
   }
   
   .page-header h1 {
-    font-size: 32px;
+    font-size: clamp(24px, 6vw, 32px);
+    margin-bottom: clamp(8px, 2vw, 14px);
   }
   
   .page-header p {
-    font-size: 16px;
+    font-size: clamp(14px, 4vw, 18px);
   }
   
   .filters-section {
-    padding: 24px;
+    padding: clamp(16px, 4vw, 24px);
+    border-radius: clamp(14px, 2vw, 18px);
+    margin-bottom: clamp(16px, 4vw, 24px);
   }
   
   .filters-row {
-    grid-template-columns: 1fr;
-    gap: 20px;
+    gap: clamp(12px, 3vw, 18px);
   }
   
   .data-table {
-    font-size: 14px;
+    min-width: 650px;
+    font-size: clamp(13px, 3vw, 15px);
   }
   
   .data-table th,
   .data-table td {
-    padding: 12px 16px;
+    padding: clamp(10px, 2vw, 14px) clamp(12px, 3vw, 16px);
   }
   
-  .modal {
-    margin: 16px;
-    width: calc(100% - 32px);
+  .customer-name,
+  .service-name,
+  .date {
+    font-size: clamp(13px, 3vw, 15px);
   }
   
-  .modal-form {
-    padding: 24px;
+  .customer-contact,
+  .service-description,
+  .time {
+    font-size: clamp(12px, 3vw, 14px);
+  }
+  
+  .status-badge,
+  .vehicle-size {
+    padding: clamp(5px, 1vw, 7px) clamp(10px, 2vw, 14px);
+    font-size: clamp(10px, 2vw, 12px);
   }
 }
 
-@media (max-width: 480px) {
-  .page-header h1 {
-    font-size: 28px;
+/* Large Mobile / Small Tablet - 480px+ */
+@media (min-width: 480px) {
+  .filters-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: clamp(14px, 3vw, 20px);
   }
   
-  .filters-section,
+  .data-table {
+    min-width: 750px;
+  }
+  
+  .modal-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: clamp(10px, 2vw, 16px);
+  }
+  
+  .cancel-btn,
+  .save-btn {
+    flex: 0 0 auto;
+    min-width: 120px;
+  }
+}
+
+/* Portrait Tablet - 600px+ */
+@media (min-width: 600px) {
+  .appointments-management {
+    padding: clamp(16px, 3vw, 24px);
+  }
+  
+  .page-header {
+    padding: clamp(32px, 6vw, 40px) clamp(24px, 4vw, 32px);
+    margin-bottom: clamp(24px, 4vw, 32px);
+    border-radius: clamp(16px, 2vw, 20px);
+  }
+  
+  .page-header h1 {
+    font-size: clamp(28px, 6vw, 36px);
+    margin-bottom: clamp(12px, 2vw, 16px);
+  }
+  
+  .page-header p {
+    font-size: clamp(16px, 3vw, 20px);
+  }
+  
+  .filters-section {
+    padding: clamp(20px, 4vw, 28px);
+    border-radius: clamp(16px, 2vw, 20px);
+    margin-bottom: clamp(20px, 4vw, 28px);
+  }
+  
+  .filters-row {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: clamp(16px, 3vw, 24px);
+  }
+  
   .table-container {
-    border-radius: 16px;
+    border-radius: clamp(16px, 2vw, 20px);
+    margin: 0;
+  }
+  
+  .data-table {
+    min-width: 900px;
+    font-size: clamp(14px, 2vw, 16px);
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: clamp(14px, 2vw, 18px) clamp(16px, 3vw, 20px);
   }
   
   .modal {
-    border-radius: 16px;
+    max-width: clamp(400px, 60vw, 520px);
+    margin: clamp(20px, 4vw, 32px) auto;
+    width: 90%;
+  }
+}
+
+/* Standard Tablet - 768px+ */
+@media (min-width: 768px) {
+  .appointments-management {
+    padding: clamp(20px, 3vw, 28px);
   }
   
-  .modal-header {
-    border-radius: 16px 16px 0 0;
-    padding: 20px 24px;
+  .page-header {
+    padding: clamp(36px, 6vw, 48px) clamp(28px, 4vw, 36px);
+    margin-bottom: clamp(28px, 4vw, 36px);
+    border-radius: clamp(18px, 2vw, 22px);
+  }
+  
+  .page-header h1 {
+    font-size: clamp(32px, 5vw, 42px);
+  }
+  
+  .page-header p {
+    font-size: clamp(17px, 3vw, 22px);
+  }
+  
+  .filters-section {
+    padding: clamp(24px, 4vw, 32px);
+    border-radius: clamp(18px, 2vw, 22px);
+    margin-bottom: clamp(24px, 4vw, 32px);
+  }
+  
+  .filters-row {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: clamp(18px, 3vw, 26px);
+  }
+  
+  .data-table {
+    min-width: 1000px;
+    font-size: clamp(14px, 2vw, 16px);
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: clamp(15px, 2vw, 20px) clamp(18px, 3vw, 24px);
+  }
+  
+  .status-badge {
+    padding: clamp(7px, 1vw, 10px) clamp(14px, 2vw, 18px);
+    font-size: clamp(11px, 2vw, 13px);
+  }
+  
+  .vehicle-size {
+    padding: clamp(6px, 1vw, 9px) clamp(13px, 2vw, 17px);
+    font-size: clamp(11px, 2vw, 13px);
+  }
+  
+  .modal {
+    max-width: clamp(480px, 65vw, 580px);
+  }
+}
+
+/* Large Tablet / Small Desktop - 1024px+ */
+@media (min-width: 1024px) {
+  .appointments-management {
+    padding: clamp(24px, 3vw, 32px);
+  }
+  
+  .page-header {
+    padding: clamp(42px, 6vw, 56px) clamp(32px, 4vw, 44px);
+    margin-bottom: clamp(32px, 4vw, 44px);
+    border-radius: clamp(20px, 2vw, 24px);
+  }
+  
+  .page-header h1 {
+    font-size: clamp(36px, 4vw, 48px);
+    margin-bottom: clamp(14px, 2vw, 18px);
+  }
+  
+  .page-header p {
+    font-size: clamp(18px, 2vw, 24px);
+  }
+  
+  .filters-section {
+    padding: clamp(28px, 4vw, 36px);
+    border-radius: clamp(20px, 2vw, 24px);
+    margin-bottom: clamp(28px, 4vw, 36px);
+  }
+  
+  .filters-row {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: clamp(20px, 3vw, 28px);
+  }
+  
+  .filter-group input,
+  .filter-group select {
+    padding: clamp(13px, 2vw, 16px) clamp(16px, 2vw, 20px);
+    font-size: clamp(14px, 1vw, 16px);
+  }
+  
+  .table-container {
+    border-radius: clamp(20px, 2vw, 24px);
+  }
+  
+  .data-table {
+    min-width: 1200px;
+    font-size: clamp(14px, 1vw, 16px);
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: clamp(16px, 2vw, 22px) clamp(20px, 2vw, 26px);
+  }
+  
+  .customer-name,
+  .service-name,
+  .date {
+    font-size: clamp(14px, 1vw, 16px);
+  }
+  
+  .customer-contact,
+  .service-description,
+  .time {
+    font-size: clamp(13px, 1vw, 15px);
+  }
+  
+  .status-badge {
+    padding: clamp(8px, 1vw, 12px) clamp(16px, 2vw, 20px);
+    font-size: clamp(11px, 1vw, 13px);
+  }
+  
+  .vehicle-size {
+    padding: clamp(7px, 1vw, 10px) clamp(14px, 2vw, 18px);
+    font-size: clamp(11px, 1vw, 13px);
+  }
+  
+  .modal {
+    max-width: clamp(520px, 60vw, 680px);
+  }
+  
+  .modal-header,
+  .modal-form {
+    padding: clamp(24px, 3vw, 36px);
   }
   
   .modal-header h3 {
-    font-size: 20px;
+    font-size: clamp(20px, 2vw, 28px);
+  }
+}
+
+/* Standard Desktop - 1200px+ */
+@media (min-width: 1200px) {
+  .appointments-management {
+    padding: clamp(28px, 3vw, 40px) clamp(32px, 4vw, 48px);
+  }
+  
+  .page-header {
+    padding: clamp(48px, 5vw, 64px) clamp(36px, 4vw, 48px);
+    margin-bottom: clamp(36px, 4vw, 48px);
+    border-radius: clamp(22px, 2vw, 28px);
+  }
+  
+  .page-header h1 {
+    font-size: clamp(40px, 3vw, 52px);
+    margin-bottom: clamp(16px, 2vw, 20px);
+  }
+  
+  .page-header p {
+    font-size: clamp(19px, 2vw, 26px);
+  }
+  
+  .filters-section {
+    padding: clamp(32px, 3vw, 44px);
+    border-radius: clamp(22px, 2vw, 28px);
+    margin-bottom: clamp(32px, 4vw, 44px);
+  }
+  
+  .filters-row {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: clamp(24px, 3vw, 32px);
+  }
+  
+  .data-table {
+    min-width: 1300px;
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: clamp(18px, 2vw, 24px) clamp(22px, 2vw, 28px);
+  }
+  
+  .status-badge {
+    padding: clamp(9px, 1vw, 13px) clamp(17px, 2vw, 22px);
+    font-size: clamp(12px, 1vw, 14px);
+  }
+  
+  .vehicle-size {
+    padding: clamp(8px, 1vw, 11px) clamp(15px, 2vw, 20px);
+    font-size: clamp(12px, 1vw, 14px);
+  }
+  
+  .modal {
+    max-width: clamp(580px, 55vw, 720px);
+  }
+}
+
+/* Large Desktop - 1440px+ */
+@media (min-width: 1440px) {
+  .appointments-management {
+    padding: clamp(32px, 3vw, 48px) clamp(40px, 4vw, 64px);
+  }
+  
+  .page-header {
+    padding: clamp(56px, 5vw, 72px) clamp(44px, 4vw, 56px);
+    margin-bottom: clamp(40px, 4vw, 56px);
+    border-radius: clamp(24px, 2vw, 32px);
+  }
+  
+  .page-header h1 {
+    font-size: clamp(44px, 3vw, 60px);
+  }
+  
+  .page-header p {
+    font-size: clamp(21px, 2vw, 30px);
+  }
+  
+  .filters-section {
+    padding: clamp(36px, 3vw, 48px);
+    border-radius: clamp(24px, 2vw, 32px);
+    margin-bottom: clamp(36px, 4vw, 48px);
+  }
+  
+  .filters-row {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: clamp(28px, 3vw, 36px);
+  }
+  
+  .data-table {
+    min-width: 1400px;
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: clamp(20px, 2vw, 28px) clamp(24px, 2vw, 32px);
+  }
+  
+  .modal {
+    max-width: clamp(620px, 50vw, 800px);
+  }
+  
+  .modal-header,
+  .modal-form {
+    padding: clamp(32px, 3vw, 44px);
+  }
+  
+  .modal-header h3 {
+    font-size: clamp(24px, 2vw, 32px);
+  }
+}
+
+/* Ultra-wide Desktop - 1920px+ */
+@media (min-width: 1920px) {
+  .appointments-management {
+    max-width: 1800px;
+    margin: 0 auto;
+    padding: clamp(40px, 2vw, 56px) clamp(48px, 3vw, 80px);
+  }
+  
+  .page-header h1 {
+    font-size: clamp(52px, 3vw, 68px);
+  }
+  
+  .page-header p {
+    font-size: clamp(24px, 1vw, 32px);
+  }
+  
+  .data-table {
+    min-width: 1600px;
+  }
+  
+  .modal {
+    max-width: clamp(680px, 45vw, 900px);
+  }
+}
+
+/* Extra Ultra-wide - 2560px+ */
+@media (min-width: 2560px) {
+  .appointments-management {
+    max-width: 2200px;
+    padding: clamp(48px, 2vw, 64px) clamp(64px, 3vw, 100px);
+  }
+  
+  .page-header h1 {
+    font-size: clamp(60px, 2vw, 76px);
+  }
+  
+  .page-header p {
+    font-size: clamp(28px, 1vw, 36px);
+  }
+  
+  .data-table {
+    min-width: 1800px;
+  }
+  
+  .modal {
+    max-width: clamp(760px, 40vw, 1000px);
+  }
+}
+
+/* Device-specific optimizations */
+
+/* iPhone SE and similar compact devices */
+@media (max-width: 375px) and (max-height: 667px) {
+  .page-header h1 {
+    font-size: clamp(18px, 5vw, 22px);
+  }
+  
+  .data-table {
+    min-width: 580px;
+    font-size: 11px;
+  }
+  
+  .modal {
+    margin: 4px;
+    width: calc(100% - 8px);
+  }
+}
+
+/* iPad Mini portrait */
+@media (min-width: 744px) and (max-width: 834px) and (orientation: portrait) {
+  .filters-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .data-table {
+    min-width: 850px;
+  }
+}
+
+/* iPad Pro and large tablets */
+@media (min-width: 1024px) and (max-width: 1366px) {
+  .filters-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .data-table {
+    min-width: 1150px;
+  }
+}
+
+/* Landscape mobile optimizations */
+@media (max-height: 500px) and (orientation: landscape) {
+  .page-header {
+    padding: clamp(12px, 3vw, 20px) clamp(16px, 4vw, 24px);
+    margin-bottom: clamp(8px, 2vw, 16px);
+  }
+  
+  .page-header h1 {
+    font-size: clamp(20px, 5vw, 28px);
+    margin-bottom: clamp(4px, 1vw, 8px);
+  }
+  
+  .page-header p {
+    font-size: clamp(12px, 3vw, 16px);
+  }
+  
+  .filters-section {
+    padding: clamp(12px, 3vw, 20px);
+  }
+  
+  .modal {
+    max-height: 90vh;
+  }
+  
+  .modal-header,
+  .modal-form {
+    padding: clamp(12px, 3vw, 20px);
+  }
+}
+
+/* High DPI / Retina displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .data-table th,
+  .data-table td {
+    border-width: 0.5px;
+  }
+  
+  .status-badge,
+  .vehicle-size {
+    border-width: 0.5px;
+  }
+  
+  .filter-group input,
+  .filter-group select,
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    border-width: 1px;
+  }
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .data-table tr,
+  .filter-group input,
+  .filter-group select,
+  .cancel-btn,
+  .save-btn,
+  .modal {
+    transition: none;
+  }
+  
+  .data-table tr:hover {
+    transform: none;
+  }
+  
+  .loading-spinner {
+    animation: none;
+    border: 4px solid #667eea;
+  }
+}
+
+/* Print styles */
+@media print {
+  .appointments-management {
+    padding: 0 !important;
+    background: white !important;
+  }
+  
+  .page-header,
+  .filters-section,
+  .table-container {
+    background: white !important;
+    box-shadow: none !important;
+    border: 1px solid #000 !important;
+    page-break-inside: avoid;
+  }
+  
+  .modal-overlay {
+    display: none !important;
+  }
+  
+  .data-table {
+    min-width: 100% !important;
+    font-size: 10px !important;
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: 4px 6px !important;
+    border: 1px solid #000 !important;
+  }
+  
+  .data-table tr:hover {
+    background: transparent !important;
+    transform: none !important;
+  }
+  
+  .status-badge,
+  .vehicle-size {
+    background: white !important;
+    color: black !important;
+    border: 1px solid #000 !important;
+    font-size: 8px !important;
+    padding: 2px 4px !important;
+  }
+  
+  .page-header h1 {
+    font-size: 24px !important;
+    color: black !important;
+  }
+  
+  .page-header p {
+    font-size: 14px !important;
+    color: black !important;
   }
 }
 </style>
