@@ -289,7 +289,6 @@ const bookAppointment = async () => {
       status: 'pending' // Will be updated to 'confirmed' after payment
     }
     
-    console.log('Creating appointment:', appointmentData)
     const appointmentResponse = await appointmentApi.createAppointment(appointmentData)
     const appointmentId = appointmentResponse.appointmentID
     
@@ -302,7 +301,6 @@ const bookAppointment = async () => {
       cancel_url: `${window.location.origin}/customer/book?payment=cancelled&appointment=${appointmentId}`
     }
     
-    console.log('Creating checkout session:', checkoutData)
     const checkoutResponse = await paymentApi.createCheckout(checkoutData)
     
     if (checkoutResponse.success && checkoutResponse.checkout_url) {

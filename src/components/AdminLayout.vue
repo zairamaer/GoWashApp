@@ -1,7 +1,10 @@
 <template>
   <div class="admin-layout">
     <!-- Sidebar -->
-    <AdminSidebar :class="{ 'mobile-open': isMobileSidebarOpen }" />
+    <AdminSidebar 
+      :class="{ 'mobile-open': isMobileSidebarOpen }" 
+      :is-mobile-open="isMobileSidebarOpen"
+    />
     
     <!-- Main Content Area -->
     <div class="main-content">
@@ -52,12 +55,16 @@
     </div>
     
     <!-- Mobile Sidebar Overlay -->
-    <div v-if="isMobileSidebarOpen" class="mobile-overlay" @click="closeMobileSidebar"></div>
+    <div 
+      v-if="isMobileSidebarOpen" 
+      class="mobile-overlay" 
+      @click="closeMobileSidebar"
+    ></div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, provide } from 'vue'
+import { ref, computed, onMounted, onUnmounted, provide, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AdminSidebar from './AdminSidebar.vue'
 
@@ -81,19 +88,26 @@ const currentPageTitle = computed(() => {
 
 const toggleMobileSidebar = () => {
   isMobileSidebarOpen.value = !isMobileSidebarOpen.value
+  // Prevent body scroll when sidebar is open
+  if (isMobileSidebarOpen.value) {
+    document.body.style.overflow = 'hidden'
+  } else {
+    document.body.style.overflow = 'auto'
+  }
 }
 
 const closeMobileSidebar = () => {
   isMobileSidebarOpen.value = false
+  document.body.style.overflow = 'auto'
 }
 
-// Provide the close function to child components (sidebar can use this)
+// Provide the close function to child components
 provide('closeMobileSidebar', closeMobileSidebar)
 
 // Handle window resize
 const handleResize = () => {
   if (window.innerWidth > 768) {
-    isMobileSidebarOpen.value = false
+    closeMobileSidebar()
   }
 }
 
@@ -110,10 +124,11 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  // Clean up body overflow on unmount
+  document.body.style.overflow = 'auto'
 })
 
 // Watch for route changes to close mobile sidebar
-import { watch } from 'vue'
 watch(() => route.path, handleRouteChange)
 </script>
 

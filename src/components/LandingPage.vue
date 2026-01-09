@@ -25,7 +25,7 @@
           <h1 class="hero-title">Keep your Clean Cars Always</h1>
           <p class="hero-subtitle">Experience premium car wash services with professional care. Book your appointment online and enjoy spotless results every time.</p>
           <div class="hero-buttons">
-            <router-link to="/customer/register" class="btn btn-primary">Book Now</router-link>
+            <router-link to="/customer/login" class="btn btn-primary">Book Now</router-link>
             <a href="#services" class="btn btn-outline" @click="scrollToServices">Our Services</a>
           </div>
         </div>
@@ -180,7 +180,6 @@ const loadServices = async () => {
   error.value = null
   
   try {
-    console.log('Fetching services from API...')
     
     // Fetch both service types and service rates
     const [serviceTypesResponse, serviceRatesResponse] = await Promise.all([
@@ -188,8 +187,6 @@ const loadServices = async () => {
       serviceApi.getServiceRates()
     ])
     
-    console.log('Service Types Response:', serviceTypesResponse)
-    console.log('Service Rates Response:', serviceRatesResponse)
     
     // Handle different response structures
     services.value = serviceTypesResponse.data || serviceTypesResponse || []
@@ -203,8 +200,6 @@ const loadServices = async () => {
       serviceRates.value = []
     }
     
-    console.log('Processed Services:', services.value)
-    console.log('Processed Service Rates:', serviceRates.value)
     
     if (services.value.length === 0) {
       error.value = 'No services available at the moment.'

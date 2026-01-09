@@ -254,11 +254,9 @@ const handleLoginSafely = async () => {
     const passwordBackup = form.password
     
     try {
-      console.log('Attempting login with:', { email: form.email })
       
       const response = await customerAuthService.login(form.email, form.password)
       
-      console.log('Login response:', response)
       
       // Check if response is valid
       if (!response || !response.data) {

@@ -7,7 +7,7 @@
           <h1 class="hero-title">Welcome Back to GoWash</h1>
           <p class="hero-subtitle">Manage your car wash appointments, view service history, and book new services with ease.</p>
           <div class="hero-buttons">
-            <button @click="bookNewService" class="btn btn-primary">Book New Service</button>
+            <router-link to="/customer/book" class="btn btn-primary">Book Now</router-link>
             <button @click="scrollToServices" class="btn btn-outline">View Services</button>
           </div>
         </div>
@@ -172,7 +172,6 @@ const scrollToServices = () => {
 }
 
 const viewAllServices = () => {
-  console.log('Navigate to all services page')
   router.push('/customer/book')
 }
 
